@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理員登入</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+	<script src="https://cdn.jsdelivr.net/npm/@ionic/core@latest/dist/ionic/ionic.js"></script>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@ionic/core@latest/dist/ionic/ionic.css">
+</head>
+<body>
+    <header>
+        <nav>
+            <ul>
+                <!--<li><a href="home.html">首頁</a></li>-->
+                <li><a href="realtime.html">實時監控</a></li>
+                <li><a href="records.html">監控紀錄</a></li>
+                <li><a href="settings.html">系統設定</a></li>
+				<li><a href="login.html">管理員登入</a></li>
+				<!--<li><a href="test.html">偵測系統測試</a></li>-->
+            </ul>
+        </nav>
+    </header>
+    
+    <main>
+    <div class="card">
+        <h2 class="card-title">Login</h2>
+        <form id="login-form" action="/login" method="POST">
+            <div class="input-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="input-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit" id="login-btn">Login</button>
+        </form>
+    </div>
+</main>
+</body>
+
+<script>
+async function login() 
+{
+	event.preventDefault();
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+
+    if (!username || !password) {
+        alert("Username and password are required");
+        return;
+    }
+
+    const data = {
+        username: username,
+        password: password
+    };
+
+    try {
+        const response = await fetch('/api/login_data', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)  
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            alert(result.message);  
+            document.cookie = `jwt_token=${result.token}; path=/; secure; SameSite=Strict;`;
+            //localStorage.setItem('jwt_token', result.token); 
+			window.location.href = 'realtime.html';
+        } else {
+            alert(result.message); 
+        }
+    } catch (error) {
+        console.error("Error:", error);
+        alert("Something went wrong!");
+    }
+}
+
+document.getElementById('login-btn').addEventListener('click', login);
+
+</script>
+</html>

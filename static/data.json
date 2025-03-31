@@ -1,0 +1,23 @@
+{
+	"device": 
+	[
+		{
+			"deviceID": "test_computer",
+			"MAC": "7c:10:c9:a2:50:1a",
+			"LastOnlineTime":"19700101000000"
+		},
+		
+		{
+			"deviceID": "test_raspberryPi",
+			"MAC": "b8:27:eb:22:77:88",
+			"LastOnlineTime":"19700101000000"
+		},
+		
+		{
+			"deviceID": "test_raspberryPi_second",
+			"MAC": "0",
+			"LastOnlineTime":"19700101000000"
+		}
+	]
+	
+}

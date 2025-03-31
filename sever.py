@@ -1,0 +1,294 @@
+from flask import Flask, request,render_template,send_from_directory,Response, jsonify, redirect, url_for
+import cv2
+import numpy as np
+import multiprocessing
+from ultralytics import YOLO
+from PIL import Image
+import datetime
+import os
+from OpenSSL import SSL
+import eventlet
+import json
+from json import load
+import time
+import requests
+import io
+import mysql.connector
+import bcrypt
+import jwt
+
+#YOLO model
+model = YOLO("best.pt")
+
+#cap = cv2.VideoCapture(0)
+
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'YOUR_KEY'
+
+device_ids = []
+
+db_config = {
+    'host': 'localhost',
+    'user': 'root',
+    'password': '', 
+    'database': 'smoke' 
+}
+connection = mysql.connector.connect(**db_config)
+if connection.is_connected():
+    cursor = connection.cursor()
+    cursor.execute("SELECT device_name FROM device")
+    results = cursor.fetchall()
+    for row in results:
+        device_ids.append(row[0])
+cursor.close()
+connection.close()
+
+#jsonFile = open("static/data.json","r")
+#deviceID = json.load(jsonFile)
+#while (deviceID["device"] != []):
+#    device_ids.append(deviceID["device"][0]["deviceID"])
+#    deviceID["device"].pop(0)
+
+
+# 使用 multiprocessing.Queue 來傳遞影像
+image_queues = {device_id: multiprocessing.Queue() for device_id in device_ids}
+realtimes_queues = {device_id: multiprocessing.Queue() for device_id in device_ids}
+
+# 影像處理和顯示的函數
+def process_and_display_image(device_id, image_queue,realtimes_queue):
+
+    ifSmoker = 0
+    
+    #10 photos per second
+    detectTimePerSmoker = 20
+    cooldownBetweenTwoTarget = -600
+    howManyframeMadeGIF = 100
+    
+    gif = []
+    
+    while True:
+        # 從佇列中獲取影像，等待直到影像可用
+        image = image_queue.get()
+
+        if image is not None:
+            results = model.track(image, conf=0.3, persist=True)
+            annotated_frame = results[0].plot()
+            im = Image.fromarray(annotated_frame[..., ::-1])
+            
+            if(ifSmoker<0):
+                ifSmoker += 1
+                if(ifSmoker<cooldownBetweenTwoTarget+howManyframeMadeGIF):
+                    gif.append(im)
+                elif(ifSmoker==cooldownBetweenTwoTarget+howManyframeMadeGIF):
+                    print("giflen=",len(gif))
+                    gif[0].save( "photo/" + datetime.datetime.now().strftime("%Y-%m-%d,%H-%M-%S,") + device_id + ".gif",save_all=True,append_images=gif[1:],duration=100,loop=0,disposal=0)
+                    gif.clear()
+            else:
+                if results[0].boxes:
+                    if(results[0].boxes.conf[0]):
+                        if(results[0].boxes.conf[0]>0.5):
+                            ifSmoker += 1
+                        else:
+                            ifSmoker = 0
+            print("ifSmoker",ifSmoker)
+            
+            if(ifSmoker>=detectTimePerSmoker):
+                ifSmoker = cooldownBetweenTwoTarget
+                
+            realtimes_queue.put(im)
+
+            #cv2.imshow(f"YOLOv8 Tracking - Device {device_id}", annotated_frame)
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
+            
+@app.route('/api/login_data', methods=['POST'])
+def login_data():
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
+
+        if not username or not password:
+            return jsonify({"message": "Username and password are required"}), 400
+
+        connection = mysql.connector.connect(**db_config)
+        cursor = connection.cursor()
+
+        cursor.execute("SELECT name, password FROM admin WHERE name = %s", (username,))
+        result = cursor.fetchone()
+
+        if result:
+            stored_password = result[1]
+            if bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
+                token = jwt.encode({
+                    'username': result[0],
+                    'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1) 
+                }, app.config['SECRET_KEY'], algorithm='HS256')
+                return jsonify({"message": "Login successful", "token": token})
+            else:
+                return jsonify({"message": "Invalid password"}), 401
+        else:
+            return jsonify({"message": "User not found"}), 404
+
+    except mysql.connector.Error as err:
+        return jsonify({"error": str(err)}), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+# 啟動影像處理進程
+def start_image_process(device_id, image_queue,realtimes_queue):
+    image_process = multiprocessing.Process(target=process_and_display_image, args=(device_id, image_queue,realtimes_queue))
+    image_process.daemon = True
+    image_process.start()
+
+image_folder = "photo"
+
+@app.route('/')
+def default():
+    token = request.cookies.get('jwt_token')
+    
+    if not token:
+        return redirect(url_for('login'))  
+
+    try:
+        jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        return render_template('realtime.html', devices=device_ids)
+    except jwt.ExpiredSignatureError:
+        return redirect(url_for('login'))  
+    except jwt.InvalidTokenError:
+        return redirect(url_for('login'))  
+    return render_template('home.html')
+
+@app.route('/home.html')
+def home():
+    token = request.cookies.get('jwt_token')
+    
+    if not token:
+        return redirect(url_for('login'))  
+
+    try:
+        jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        return render_template('home.html')
+    except jwt.ExpiredSignatureError:
+        return redirect(url_for('login'))  
+    except jwt.InvalidTokenError:
+        return redirect(url_for('login'))  
+     
+@app.route('/realtime.html')
+def realtime():
+    token = request.cookies.get('jwt_token')
+    
+    if not token:
+        return redirect(url_for('login'))  
+
+    try:
+        jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        return render_template('realtime.html', devices=device_ids)
+    except jwt.ExpiredSignatureError:
+        return redirect(url_for('login'))  
+    except jwt.InvalidTokenError:
+        return redirect(url_for('login'))  
+     
+@app.route('/records.html')
+def records():
+    token = request.cookies.get('jwt_token')
+    
+    if not token:
+        return redirect(url_for('login'))  
+
+    try:
+        jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        image_files = [f for f in os.listdir(image_folder)if f.endswith(".png") or f.endswith(".gif") ]
+        return render_template('records.html', image_files=image_files)
+    except jwt.ExpiredSignatureError:
+        return redirect(url_for('login'))  
+    except jwt.InvalidTokenError:
+        return redirect(url_for('login'))
+
+@app.route('/settings.html')
+def settings():
+    token = request.cookies.get('jwt_token')
+    
+    if not token:
+        return redirect(url_for('login'))  
+
+    try:
+        jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        return render_template('settings.html')
+    except jwt.ExpiredSignatureError:
+        return redirect(url_for('login'))  
+    except jwt.InvalidTokenError:
+        return redirect(url_for('login'))  
+
+@app.route('/login.html')
+def login():
+    token = request.cookies.get('jwt_token')
+    
+    if not token:
+        return render_template('login.html')
+
+    try:
+        jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        return redirect(url_for('realtime'))  
+    except jwt.ExpiredSignatureError:
+        return render_template('login.html')
+    except jwt.InvalidTokenError:
+        return render_template('login.html')
+     
+@app.route('/test.html')
+def test():
+    return render_template('test.html')
+
+@app.route('/images/<path:filename>')
+def get_image(filename):
+    return send_from_directory(image_folder, filename)
+
+@app.route('/upload_video/<device_id>', methods=['POST'])
+def upload_video(device_id):
+    # 從 POST 請求中獲取上傳的影像資料
+    
+    image_data = request.data
+    
+    if image_data:
+        # 將接收到的二進制資料轉換成 NumPy 陣列
+        nparr = np.frombuffer(image_data, np.uint8)
+
+        # 使用 OpenCV 解碼影像
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        # 放入影像佇列
+        image_queues[device_id].put(image)
+
+        # 返回成功回應
+        return '影像上傳成功'
+
+    # 如果未接收到影像資料，返回錯誤回應
+    return '未收到影像資料', 400
+
+def get_image_frames(device_id):
+     while True:
+        if (realtimes_queues[device_id].get()) is not None:
+            image_data = realtimes_queues[device_id].get()
+            print(image_data)
+            im_data = np.array(image_data)
+            im_data_rgb = cv2.cvtColor(im_data, cv2.COLOR_BGR2RGB)
+            _, img_encoded = cv2.imencode('.jpg', im_data_rgb)
+            image_data_restored = img_encoded.tobytes()
+            yield (b'--frame\r\n'b'Content-Type: image/jpeg\r\n\r\n' + image_data_restored + b'\r\n')
+
+@app.route('/api/stream/<device_id>')
+def video_stream(device_id):
+    return Response(get_image_frames(device_id), mimetype='multipart/x-mixed-replace; boundary=frame')
+    
+if __name__ == '__main__':
+    
+    # 啟動一個影像處理進程，每個設備一個
+    for device_id in device_ids:
+        start_image_process(device_id, image_queues[device_id],realtimes_queues[device_id])
+    
+    app.run(debug=False, host='0.0.0.0', port=YOUR_PORT,ssl_context=("cert/server.crt", "cert/server.key"))
+

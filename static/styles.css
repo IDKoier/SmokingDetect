@@ -1,0 +1,306 @@
+/* 基本樣式 */
+body {
+    font-family:  "Microsoft JhengHei", Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f0f0f0;
+}
+
+#image-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 20px;
+}
+
+.image-caption {
+	font-family:  "Microsoft JhengHei", Arial, sans-serif;
+    font-size: 32px; /* 根据需要调整字体大小 */
+    color: #333; /* 根据需要调整颜色 */
+}
+
+.image-box {
+    text-align: center;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 10px;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+    width: 805px; /* 调整框的宽度 */
+	height: 690px;
+    margin: 10px; /* 调整框与框之间的间距 */
+}
+
+.image-box img 
+{
+	width: 800px; 
+	height: 600px;
+    margin-bottom: 10px; /* 调整图像与标题之间的间距 */
+}
+
+
+
+/* 左側查詢選項樣式 */
+aside 
+{
+    background-color: #333;
+    color: #fff;
+    width: 200px;
+    padding: 20px;
+    text-align: center;
+}
+
+aside h2 {
+    margin: 0;
+    padding: 0;
+}
+
+aside div 
+{
+	font-size: 20px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    text-align: center;
+}
+
+/* 導航欄樣式 */
+header {
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+}
+
+nav ul {
+    list-style: none;
+    padding: 0;
+	text-align: center;
+}
+
+nav li {
+	display: inline-block;
+    margin: 10px;
+	margin-right: 20px;
+}
+
+nav a {
+    text-decoration: none;
+    color: #fff;
+}
+
+
+
+/* 主內容樣式 */
+main 
+{
+    /*max-width: 800px;
+    margin: 20px auto;
+    background-color: #fff;
+    padding: 20px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    text-align: center;
+	float: right;*/
+}
+
+main ul li div {
+    background-color: #333;
+    color: #fff;
+    text-decoration: none;
+    padding: 10px;
+    border-radius: 5px;
+    display: inline-block;
+    margin-right: 20px;
+    cursor: pointer;
+}
+
+/* 鼠标悬停时的样式 */
+main ul li div:hover {
+    background-color: #555;
+}
+/* 選項連結樣式 */
+ul {
+    list-style: none;
+    padding: 0;
+}
+
+ul li {
+    margin: 10px 0;
+}
+
+ul li a {
+    display: block;
+    background-color: #333;
+    color: #fff;
+    text-decoration: none;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+ul li a:hover {
+    background-color: #555;
+}
+
+.hidden-options {
+    display: none;
+}
+
+ul#time-options li div , ul#location-options li div
+{
+    font-size: 14px; /* 修改字体大小 */
+    border: none; /* 移除边框 */
+    margin-right: 10px; /* 调整右边距 */
+}
+
+ul#time-options li div:hover , ul#location-options li div:hover
+{
+    background-color: #555; /* 鼠标悬停时的背景颜色 */
+}
+
+.note-container {
+    position: absolute;
+	top: 70px; /* 调整到页面顶部下方，以避免与header重叠 */
+    left: 240px; /* 调整到左侧，以避免与aside重叠 */
+    padding: 20px; /* 添加一些内边距，以避免内容紧贴边缘 */
+	display: flex; /* 使用Flex布局 */
+	flex-direction: column; /* 让note堆叠在一列 */
+	 width: calc(95% - 240px); 
+}
+
+.note {
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 10px;
+    cursor: pointer;
+    background-color: #fff;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 10px;
+	 width: 100%; /* 让宽度占满父容器 */
+	margin-bottom: 10px;
+}
+
+.note img {
+    max-width: 100%; /* 使图像适应其容器 */
+	height: auto; /* 保持图像的纵横比 */
+    margin-right: 10px; /* 设置图像与描述之间的间距 */
+	width: 400px; /* 调整图片的宽度 */
+    height: 300px; /* 调整图片的高度 */
+}
+.descriptions
+{
+	display: flex;
+    flex-direction: column; 
+    align-items: flex-start;
+    flex: 2;
+}
+
+.description 
+{
+    flex: 1;
+	font-size: 30px;
+    color: #555;
+	margin: 30px 0;
+}
+
+/*.description p 
+{
+    font-size: 200px;
+    color: #555;
+	margin: 2px 0;
+}*/
+
+.card {
+    background-color: #fff;
+    padding: 20px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* 添加陰影效果 */
+    border-radius: 8px; /* 圓角 */
+    width: 100%;
+    max-width: 400px; /* 限制卡片最大寬度 */
+    box-sizing: border-box; /* 包含 padding 和 border */
+	margin: 0 auto; /* 使卡片水平居中 */
+}
+
+/* 卡片標題樣式 */
+.card-title {
+    text-align: center;  /* 文字置中 */
+    font-size: 24px;  /* 字體大小 */
+    margin-bottom: 20px;  /* 底部間距 */
+    color: #333;  /* 文字顏色 */
+}
+
+/* 輸入框組的樣式 */
+.input-group {
+    margin-bottom: 15px;  /* 每個輸入框底部間距 */
+}
+
+/* 輸入框標籤的樣式 */
+input[type="text"],
+input[type="password"] {
+    width: 100%;
+	max-width: 95%;
+    padding: 10px;
+    margin-top: 5px;
+    border: 1px solid #ccc;  /* 邊框顏色 */
+    border-radius: 4px;  /* 圓角 */
+    font-size: 16px;  /* 字體大小 */
+}
+
+/* 登入按鈕的樣式 */
+button[type="submit"] {
+    width: 100%;
+    padding: 10px;
+    background-color: #007bff;  /* 按鈕背景色 */
+    color: white;  /* 按鈕文字顏色 */
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+/* 按鈕 hover 效果 */
+button[type="submit"]:hover {
+    background-color: #0056b3;  /* 當按鈕被 hover 時的顏色 */
+}
+.settings-card {
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 600px; /* 限制卡片最大寬度 */
+    box-sizing: border-box;
+	margin: 0 auto;
+}
+
+.settings-title {
+    text-align: center;
+    font-size: 28px;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.settings-section {
+    margin-bottom: 30px;
+}
+
+.section-title {
+    font-size: 20px;
+    margin-bottom: 10px;
+    color: #007bff;
+}
+
+.separator {
+    margin: 20px 0;
+    border: 0;
+    border-top: 2px solid #ccc;
+}
+
+/* 小卡片樣式 */
+.settings-section p {
+    font-size: 16px;
+    color: #555;
+    padding-left: 10px;
+    border-left: 4px solid #007bff;
+}

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>監控紀錄</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <header>
+        <nav>
+            <ul>
+                <!--<li><a href="home.html">首頁</a></li>-->
+                <li><a href="realtime.html">實時監控</a></li>
+                <li><a href="records.html">監控紀錄</a></li>
+                <li><a href="settings.html">系統設定</a></li>
+				<li><a href="login.html">管理員登入</a></li>
+				<!--<li><a href="test.html">偵測系統測試</a></li>-->
+            </ul>
+        </nav>
+    </header>
+    
+    <aside>
+    <h2>查詢選項</h2>
+    <form>
+        <ul>
+            <li>
+                 <div id="time-toggle">依時間查詢：</div>
+				 <ul id="time-options" class="hidden-options">
+                    <li>
+                        <div id="1-hour">近一小時</div>
+                    </li>
+                    <li>
+                        <div id="6-hour">近六小時</div>
+                    </li>
+                    <li>
+                        <div id="1-day">近一天</div>
+                    </li>
+                    <li>
+                        <div id="1-week">近一星期</div>
+                    </li>
+					<li>
+                        <div id="1-mouth">近一個月</div>
+                    </li>
+					<li>
+                        <div id="all">總覽</div>
+                    </li>
+                </ul>
+            </li>
+            <li>
+               <div id="location-toggle">依地點查詢：</div>
+				<ul id="location-options" class="hidden-options">
+                </ul>
+            </li>
+        </ul>
+    </form>
+</aside>
+
+<main>
+
+			<div class="note-container">
+    {% for image_file in image_files %}
+        <div class="note" style="order: {{ loop.revindex }}">
+            <img src="{{ url_for('get_image', filename=image_file) }}" alt="Image">
+            <div class="descriptions">
+                <p class="description" id="location-part-{{ loop.index }}">地點：</p>
+                <p class="description" id="date-part-{{ loop.index }}">日期：</p>
+                <p class="description" id="time-part-{{ loop.index }}">時間：</p>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        var imageFiles = {{ image_files | tojson | safe }};
+        var notes = document.querySelectorAll('.note');
+		var locationButtons = {};
+		var locationOptions = document.getElementById('location-options'); 
+		
+        for (var i = 0; i < imageFiles.length; i++) 
+		{
+            var filename = imageFiles[i];
+            var parts = filename.split(',');
+            var locationPart, datePart, timePart;
+
+            if (parts.length >= 3) 
+			{
+                locationPart = parts[2].split('.')[0];
+                datePart = parts[0];
+                timePart = parts[1].replace("-",":").replace("-",":");
+            }
+			else 
+			{
+                locationPart = "Unknown";
+                datePart = "Unknown";
+                timePart = "Unknown";
+            }
+			
+			if (!locationButtons[locationPart]) 
+			{
+				locationButtons[locationPart] = document.createElement('div');
+				locationButtons[locationPart].textContent = locationPart;
+				var liElement = document.createElement('li');
+				liElement.appendChild(locationButtons[locationPart]);
+				locationOptions.appendChild(liElement);
+			}
+			
+            document.getElementById("location-part-" + (i + 1)).textContent += locationPart;
+            document.getElementById("date-part-" + (i + 1)).textContent += datePart;
+            document.getElementById("time-part-" + (i + 1)).textContent += timePart;
+        }
+		
+		var allLocation = document.createElement('div');
+		allLocation.textContent = "總覽";
+		var liElement = document.createElement('li');
+        liElement.appendChild(allLocation);
+		locationOptions.appendChild(liElement);
+		 
+        var timeOptions = document.querySelectorAll('#time-options div');
+        timeOptions.forEach(function (option) {
+            option.addEventListener('click', function () {
+                var filterTime = this.textContent; 
+
+                var currentTime = new Date();
+
+                for (var i = 0; i < notes.length; i++) 
+				{
+                    var note = notes[i];
+                    var datePart = document.getElementById("date-part-" + (i + 1)).textContent;
+                    var timePart = document.getElementById("time-part-" + (i + 1)).textContent;
+					
+					datePart = datePart.replace(/^日期：/, "");
+					timePart = timePart.replace(/^時間：/, "");
+					
+					var datePartArray = datePart.split("-");
+					var timePartArray = timePart.split(":");
+					
+
+					var year = parseInt(datePartArray[0], 10);
+					var month = parseInt(datePartArray[1], 10)-1 ;
+					var day = parseInt(datePartArray[2], 10);
+					var hour = parseInt(timePartArray[0], 10);
+					var minute = parseInt(timePartArray[1], 10);
+					var second = parseInt(timePartArray[2], 10);
+					
+					var noteDateTime = new Date(year, month, day, hour, minute, second);
+					console.log("Note " + i + " datePart: " + datePart); 
+					console.log("Note " + i + " timePart: " + timePart); 
+
+                    var timeDifference = currentTime - noteDateTime;
+					console.log("currentTime "  + currentTime);
+					console.log("noteDateTime " + noteDateTime);
+
+                    var hoursDifference = timeDifference / 1000 / 60 / 60;
+						
+                    if (hoursDifference <= 1 && filterTime === "近一小時") 
+					{
+                        note.style.display = "flex"; 
+                    }
+					else if (hoursDifference <= 3 && filterTime === "近三小時")
+					{
+                        note.style.display = "flex"; 
+                    }
+					else if (hoursDifference <= 24 && filterTime === "近一天")
+					{
+                        note.style.display = "flex"; 
+                    }
+					else if (hoursDifference <= 168 && filterTime === "近一星期")
+					{
+                        note.style.display = "flex"; 
+                    }
+					else if (hoursDifference <= 720 && filterTime === "近一個月")
+					{
+                        note.style.display = "flex"; 
+                    }
+					else if(filterTime === "總覽")
+						note.style.display = "flex";
+					else
+					{
+                        note.style.display = "none"; 
+                    }
+                }
+				
+            });
+        });
+		
+		
+		var locationButtons = document.querySelectorAll('#location-options li div');
+
+		locationButtons.forEach(function (button) 
+		{
+			button.addEventListener('click', function ()
+			{
+				var filterLocation = this.textContent; 
+				
+				for (var i = 0; i < notes.length; i++)
+				{
+					var note = notes[i];
+					var locationPart = document.getElementById("location-part-" + (i + 1)).textContent;
+					locationPart = locationPart.replace(/^地點：/, "");
+
+					if (locationPart === filterLocation || filterLocation === "總覽") 
+					{
+						note.style.display = "flex"; 
+					}
+					else 
+					{
+						note.style.display = "none"; 
+					}
+				}
+			});
+		});
+});
+	
+</script>
+
+
+		
+</main>
+
+	
+</body>
+	<script src="{{ url_for('static', filename='script.js') }}"></script>
+</html>

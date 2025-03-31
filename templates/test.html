@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+  <head>
+     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>偵測系統測試</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <header>
+        <nav>
+            <ul>
+                <li><a href="home.html">首頁</a></li>
+                <li><a href="realtime.html">實時監控</a></li>
+                <li><a href="records.html">監控紀錄</a></li>
+                <li><a href="settings.html">系統設定</a></li>
+				<li><a href="test.html">偵測系統測試</a></li>
+            </ul>
+        </nav>
+    </header>
+  <body>
+    <video id="video" autoplay></video>
+    <button id="startButton">Start Camera</button>
+    <button id="stopButton">Stop Camera</button>
+	<button id="uploadButton">Upload Image</button>
+    <script>
+      const video = document.getElementById('video');
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const uploadButton = document.getElementById('uploadButton');
+
+        startButton.addEventListener('click', startCamera);
+        stopButton.addEventListener('click', stopCamera);
+        uploadButton.addEventListener('click', uploadImage);
+
+        let stream;
+
+        async function startCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                video.srcObject = stream;
+            } catch (error) {
+                console.error('Error accessing camera:', error);
+            }
+        }
+
+        function stopCamera() {
+            if (stream) {
+                const tracks = stream.getTracks();
+
+                tracks.forEach(function (track) {
+                    track.stop();
+                });
+
+                video.srcObject = null;
+            }
+        }
+
+        function uploadImage() {
+            // Create a canvas element
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            // Get the drawing context
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Convert the canvas content to a data URL
+            const dataURL = canvas.toDataURL('image/png');
+
+            // Send the data to the server
+
+            fetch('/upload_video/test_webcam', {
+                method: 'POST',
+                body: dataURL.split(',')[1], // Remove the "data:image/png;base64," prefix
+            })
+            .then(response => response.text())
+            .then(result => console.log(result))
+            .catch(error => console.error('Error uploading image:', error));
+        }
+    </script>
+  </body>
+</html>
