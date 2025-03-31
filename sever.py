@@ -214,11 +214,25 @@ def settings():
     token = request.cookies.get('jwt_token')
     
     if not token:
-        return redirect(url_for('login'))  
-
+        return redirect(url_for('login'))
+        
+    connection = mysql.connector.connect(**db_config)
+    cursor = connection.cursor()
+    
+    cursor.execute("SELECT device_name, last_online_time FROM device")
+    results = cursor.fetchall()
+    devices = [] 
+    for row in results:
+        devices.append({
+            'device_name': row[0], 
+            'last_online_time': row[1] })
+    
+    cursor.close()
+    connection.close()
+        
     try:
         jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-        return render_template('settings.html')
+        return render_template('settings.html', devices=devices)
     except jwt.ExpiredSignatureError:
         return redirect(url_for('login'))  
     except jwt.InvalidTokenError:
