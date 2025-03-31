@@ -28,7 +28,7 @@
             <!-- 設備管理部分 -->
             <div class="settings-section">
                 <h3 class="section-title">設備管理</h3>
-                <p>設備管理</p>
+					<div id="device-cards-container">
             </div>
             
             <hr class="separator"> <!-- 分隔線 -->
@@ -39,6 +39,78 @@
                 <p>帳號管理</p>
             </div>
         </div>
+		<script>
+    // 假設後端傳來的 'devices' 資料
+    var devices = {{ devices | tojson }}; // 使用 Jinja2 將後端的 devices 轉換為 JavaScript 陣列
+
+    // 查找設備卡片容器
+    var container = document.getElementById('device-cards-container');
+
+    // 獲取當前時間
+    var currentTime = new Date();
+
+    // 檢查 devices 是否有資料
+    if (devices && devices.length > 0) {
+        devices.forEach(function(device) {
+            // 為每一個設備建立一個卡片元素
+            var card = document.createElement('div');
+            card.classList.add('device-card');
+            
+            // 卡片內的設備名稱
+            var deviceName = document.createElement('h4');
+            deviceName.classList.add('device-name');
+            deviceName.textContent = device.device_name; // 設備名稱
+
+            // 計算最後上線時間
+            var lastOnlineTime = new Date(device.last_online_time);
+
+// 將 UTC 時間轉換為台北時間
+var localTime = new Date(lastOnlineTime.getTime() + 8 * 60 * 60 * 1000);  // 加上 8 小時
+
+console.log("lastOnlineTime (UTC):", lastOnlineTime);
+console.log("lastOnlineTime (Taipei Time):", localTime);
+
+
+            // 計算時間差異（以秒為單位）
+            var timeDifference = Math.floor((currentTime - lastOnlineTime) / 1000); // 轉換為秒
+
+            // 根據時間差異顯示對應訊息
+            var onlineStatus = '';
+            if (timeDifference < 10) {
+                onlineStatus = '目前正在線上';
+            } else if (timeDifference < 60) {
+                onlineStatus = timeDifference + ' 秒前在線';
+            } else if (timeDifference < 3600) {
+                var minutes = Math.floor(timeDifference / 60);
+                onlineStatus = minutes + ' 分鐘前在線';
+            } else {
+                var hours = Math.floor(timeDifference / 3600);
+                var minutes = Math.floor((timeDifference % 3600) / 60);
+                onlineStatus = '最後上線時間: ' + (hours < 10 ? '0' + hours : hours) + ':' + (minutes < 10 ? '0' + minutes : minutes);
+            }
+
+            // 卡片內的最後上線時間
+            var onlineStatusElement = document.createElement('p');
+            onlineStatusElement.classList.add('last-online-time');
+
+            // 創建文本節點並插入
+            var statusTextNode = document.createTextNode(onlineStatus);
+            onlineStatusElement.appendChild(statusTextNode); // 插入文本節點
+
+            // 將設備名稱和最後上線時間插入到卡片中
+            card.appendChild(deviceName);
+            card.appendChild(onlineStatusElement);
+
+            // 將卡片插入到容器中
+            container.appendChild(card);
+        });
+    } else {
+        var noDevicesMessage = document.createElement('p');
+        noDevicesMessage.textContent = '目前沒有設備資料。';
+        container.appendChild(noDevicesMessage);
+    }
+</script>
+
     </main>
 </body>
 </html>
