@@ -31,49 +31,90 @@
 					<div id="device-cards-container">
             </div>
             
-            <hr class="separator"> <!-- 分隔線 -->
+            <hr class="separator"> 
 
             <!-- 新增管理員帳號部分 -->
             <div class="settings-section">
                 <h3 class="section-title">帳號管理</h3>
                 <p>帳號管理</p>
+				<hr class="separator"> 
+				  <h3 class="section-title">腳本下載</h3>
+    <label for="deviceID">輸入設備 ID：</label>
+    <input type="text" id="deviceID" placeholder="請輸入設備 ID">
+    <button onclick="downloadScript()">下載腳本</button>
             </div>
         </div>
+		<style>
+    .form-container {
+        max-width: 400px;
+        margin: 20px auto;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background-color: #f9f9f9;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: bold;
+    }
+
+    input[type="text"] {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 15px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+
+    .button-container {
+        text-align: center;
+    }
+
+    button {
+        background-color: #4CAF50;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+        transition: background-color 0.3s;
+    }
+
+    button:hover {
+        background-color: #45a049;
+    }
+</style>
 		<script>
-    // 假設後端傳來的 'devices' 資料
-    var devices = {{ devices | tojson }}; // 使用 Jinja2 將後端的 devices 轉換為 JavaScript 陣列
+   var devices = {{ devices | tojson }}; // 使用 Jinja2 將後端的 devices 轉換為 JavaScript 陣列
+        var container = document.getElementById('device-cards-container');
+		var currentTime = new Date();
+		
+        // 檢查 devices 是否有資料
+        if (devices && devices.length > 0) {
+            devices.forEach(function(device) {
+                // 為每一個設備建立一個卡片元素
+                var card = document.createElement('div');
+                card.classList.add('device-card');
+                
+                // 卡片內的設備名稱
+                var deviceName = document.createElement('h4');
+                deviceName.classList.add('device-name');
+                deviceName.textContent = device.device_name; // 設備名稱
 
-    // 查找設備卡片容器
-    var container = document.getElementById('device-cards-container');
-
-    // 獲取當前時間
-    var currentTime = new Date();
-
-    // 檢查 devices 是否有資料
-    if (devices && devices.length > 0) {
-        devices.forEach(function(device) {
-            // 為每一個設備建立一個卡片元素
-            var card = document.createElement('div');
-            card.classList.add('device-card');
-            
-            // 卡片內的設備名稱
-            var deviceName = document.createElement('h4');
-            deviceName.classList.add('device-name');
-            deviceName.textContent = device.device_name; // 設備名稱
-
-            // 計算最後上線時間
-            var lastOnlineTime = new Date(device.last_online_time);
-
-// 將 UTC 時間轉換為台北時間
-var localTime = new Date(lastOnlineTime.getTime() + 8 * 60 * 60 * 1000);  // 加上 8 小時
-
-console.log("lastOnlineTime (UTC):", lastOnlineTime);
-console.log("lastOnlineTime (Taipei Time):", localTime);
-
+               var lastOnlineTime = new Date(device.last_online_time);
+			   lastOnlineTime = new Date(lastOnlineTime.getTime() -28800000);
 
             // 計算時間差異（以秒為單位）
-            var timeDifference = Math.floor((currentTime - lastOnlineTime) / 1000); // 轉換為秒
-
+			console.log(device.device_name,":lastOnlineTime:",device.last_online_time);
+			console.log(device.device_name,":lastOnlineTime2:",lastOnlineTime);
+			console.log("TimeNow:",currentTime);
+            var timeDifference = Math.floor((currentTime - lastOnlineTime) / 1000); 
+			
             // 根據時間差異顯示對應訊息
             var onlineStatus = '';
             if (timeDifference < 10) {
@@ -84,30 +125,36 @@ console.log("lastOnlineTime (Taipei Time):", localTime);
                 var minutes = Math.floor(timeDifference / 60);
                 onlineStatus = minutes + ' 分鐘前在線';
             } else {
-                var hours = Math.floor(timeDifference / 3600);
-                var minutes = Math.floor((timeDifference % 3600) / 60);
-                onlineStatus = '最後上線時間: ' + (hours < 10 ? '0' + hours : hours) + ':' + (minutes < 10 ? '0' + minutes : minutes);
+                onlineStatus = '最後上線時間: ' + device.last_online_time;
             }
 
             // 卡片內的最後上線時間
             var onlineStatusElement = document.createElement('p');
             onlineStatusElement.classList.add('last-online-time');
+            onlineStatusElement.textContent = onlineStatus; // 顯示狀態訊息
 
-            // 創建文本節點並插入
-            var statusTextNode = document.createTextNode(onlineStatus);
-            onlineStatusElement.appendChild(statusTextNode); // 插入文本節點
+                // 將設備名稱和最後上線時間插入到卡片中
+                card.appendChild(deviceName);
+                card.appendChild(onlineStatusElement);
 
-            // 將設備名稱和最後上線時間插入到卡片中
-            card.appendChild(deviceName);
-            card.appendChild(onlineStatusElement);
-
-            // 將卡片插入到容器中
-            container.appendChild(card);
-        });
-    } else {
-        var noDevicesMessage = document.createElement('p');
-        noDevicesMessage.textContent = '目前沒有設備資料。';
-        container.appendChild(noDevicesMessage);
+                // 將卡片插入到容器中
+                container.appendChild(card);
+            });
+        } else {
+            var noDevicesMessage = document.createElement('p');
+            noDevicesMessage.textContent = '目前沒有設備資料。';
+            container.appendChild(noDevicesMessage);
+        }
+	 function downloadScript() {
+        var deviceID = document.getElementById("deviceID").value.trim();
+        
+        if (deviceID === "") {
+            alert("請輸入設備 ID");
+            return;
+        }
+        
+        var downloadUrl = "/generate_script?device_ID=" + encodeURIComponent(deviceID);
+        window.location.href = downloadUrl;
     }
 </script>
 

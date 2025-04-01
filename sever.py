@@ -1,4 +1,4 @@
-from flask import Flask, request,render_template,send_from_directory,Response, jsonify, redirect, url_for
+from flask import Flask, request,render_template,send_from_directory,Response, jsonify, redirect, url_for,send_file
 import cv2
 import numpy as np
 import multiprocessing
@@ -24,6 +24,9 @@ model = YOLO("best.pt")
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'YOUR_KEY'
+
+SERVER_IP = "YOUR_IP_ADDRESS"
+SERVER_PORT = "YOUR_PORT"
 
 device_ids = []
 
@@ -139,7 +142,20 @@ def login_data():
         if connection:
             connection.close()
 
-# 啟動影像處理進程
+def check_login_data():
+    token = request.cookies.get('jwt_token')
+    
+    if not token:
+        return False
+
+    try:
+        jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        return True
+    except jwt.ExpiredSignatureError:
+        return False
+    except jwt.InvalidTokenError:
+        return False
+
 def start_image_process(device_id, image_queue,realtimes_queue):
     image_process = multiprocessing.Process(target=process_and_display_image, args=(device_id, image_queue,realtimes_queue))
     image_process.daemon = True
@@ -149,109 +165,117 @@ image_folder = "photo"
 
 @app.route('/')
 def default():
-    token = request.cookies.get('jwt_token')
-    
-    if not token:
-        return redirect(url_for('login'))  
-
-    try:
-        jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+    if check_login_data():
         return render_template('realtime.html', devices=device_ids)
-    except jwt.ExpiredSignatureError:
-        return redirect(url_for('login'))  
-    except jwt.InvalidTokenError:
-        return redirect(url_for('login'))  
-    return render_template('home.html')
+    else:
+        return redirect(url_for('login'))
 
 @app.route('/home.html')
 def home():
-    token = request.cookies.get('jwt_token')
-    
-    if not token:
-        return redirect(url_for('login'))  
-
-    try:
-        jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-        return render_template('home.html')
-    except jwt.ExpiredSignatureError:
-        return redirect(url_for('login'))  
-    except jwt.InvalidTokenError:
-        return redirect(url_for('login'))  
+    if check_login_data():
+       return render_template('home.html')
+    else:
+        return redirect(url_for('login'))
      
 @app.route('/realtime.html')
 def realtime():
-    token = request.cookies.get('jwt_token')
-    
-    if not token:
-        return redirect(url_for('login'))  
-
-    try:
-        jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+    if check_login_data():
         return render_template('realtime.html', devices=device_ids)
-    except jwt.ExpiredSignatureError:
-        return redirect(url_for('login'))  
-    except jwt.InvalidTokenError:
-        return redirect(url_for('login'))  
+    else:
+        return redirect(url_for('login'))
      
 @app.route('/records.html')
 def records():
-    token = request.cookies.get('jwt_token')
-    
-    if not token:
-        return redirect(url_for('login'))  
-
-    try:
-        jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+    if check_login_data():
         image_files = [f for f in os.listdir(image_folder)if f.endswith(".png") or f.endswith(".gif") ]
         return render_template('records.html', image_files=image_files)
-    except jwt.ExpiredSignatureError:
-        return redirect(url_for('login'))  
-    except jwt.InvalidTokenError:
+    else:
         return redirect(url_for('login'))
 
 @app.route('/settings.html')
 def settings():
-    token = request.cookies.get('jwt_token')
-    
-    if not token:
+    if check_login_data():
+        connection = mysql.connector.connect(**db_config)
+        if connection.is_connected():
+            cursor = connection.cursor()
+            cursor.execute("SELECT device_name,last_online_time FROM device")
+            results = cursor.fetchall()
+            devices = []
+            for row in results:
+                devices.append({
+                    'device_name': row[0], 
+                    'last_online_time': row[1]
+                })
+            cursor.close()
+            connection.close()
+        return render_template('settings.html',devices=devices)
+    else:
         return redirect(url_for('login'))
-        
-    connection = mysql.connector.connect(**db_config)
-    cursor = connection.cursor()
+
+@app.route('/generate_script')
+def generate_script():
+    device_ID = request.args.get("device_ID", "default_device").strip()
+
+    script_content = f'''import cv2
+import requests
+import time
+import logging
+import uuid
+
+def get_mac_address():
+    mac = ':'.join(['{{:02x}}'.format((uuid.getnode() >> elements) & 0xff) for elements in range(0, 2 * 6, 8)][::-1])
+    return mac
     
-    cursor.execute("SELECT device_name, last_online_time FROM device")
-    results = cursor.fetchall()
-    devices = [] 
-    for row in results:
-        devices.append({
-            'device_name': row[0], 
-            'last_online_time': row[1] })
-    
-    cursor.close()
-    connection.close()
-        
+logging.basicConfig(
+    filename="error_log.txt",
+    level=logging.ERROR,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+device_ID = "{device_ID}"
+device_MAC = get_mac_address()
+server_ip = "{SERVER_IP}"
+server_port = "{SERVER_PORT}"
+server_url = "https://" + server_ip + ":" + server_port + "/upload_video/" + device_ID
+
+cap = cv2.VideoCapture(0)
+
+while True:
     try:
-        jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-        return render_template('settings.html', devices=devices)
-    except jwt.ExpiredSignatureError:
-        return redirect(url_for('login'))  
-    except jwt.InvalidTokenError:
-        return redirect(url_for('login'))  
+        while cap.isOpened():
+            ret, frame = cap.read()
+
+            if not ret:           
+                print("Webcam is not available.")
+                logging.error("Webcam is not available.")
+                time.sleep(5)
+                continue
+
+            _, img_encoded = cv2.imencode('.jpg', frame)
+            image_data = img_encoded.tobytes()
+            response = requests.post(server_url, data=image_data, verify=False)
+            print(response.text)
+
+    except Exception as e:
+        error_message = f"Exception occurred: {{e}}"
+        print("Wait 5 seconds to restart.", error_message)
+        logging.error(error_message) 
+        time.sleep(5)
+
+    finally:
+        cap.release()
+        cv2.destroyAllWindows()
+'''
+
+    script_path = os.path.join(os.getcwd(), "uploadmul.py")
+    with open(script_path, "w", encoding="utf-8") as file:
+        file.write(script_content)
+
+    return send_file(script_path, as_attachment=True)
 
 @app.route('/login.html')
 def login():
-    token = request.cookies.get('jwt_token')
-    
-    if not token:
-        return render_template('login.html')
-
-    try:
-        jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-        return redirect(url_for('realtime'))  
-    except jwt.ExpiredSignatureError:
-        return render_template('login.html')
-    except jwt.InvalidTokenError:
-        return render_template('login.html')
+    return render_template('login.html')
      
 @app.route('/test.html')
 def test():
@@ -304,5 +328,5 @@ if __name__ == '__main__':
     for device_id in device_ids:
         start_image_process(device_id, image_queues[device_id],realtimes_queues[device_id])
     
-    app.run(debug=False, host='0.0.0.0', port=YOUR_PORT,ssl_context=("cert/server.crt", "cert/server.key"))
+    app.run(debug=False, host='0.0.0.0', port=SERVER_PORT,ssl_context=("cert/server.crt", "cert/server.key"))
 

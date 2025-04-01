@@ -14,18 +14,17 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-device_ID = "test_computer"
+device_ID = "123"
 device_MAC = get_mac_address()
 server_ip = "YOUR_IP_ADDRESS"
 server_port = "YOUR_PORT"
-server_url = "https://"+server_ip+":"+server_port +"/upload_video/" + device_ID
+server_url = "https://" + server_ip + ":" + server_port + "/upload_video/" + device_ID
 
 cap = cv2.VideoCapture(0)
 
 while True:
     try:
         while cap.isOpened():
-
             ret, frame = cap.read()
 
             if not ret:           
@@ -35,17 +34,9 @@ while True:
                 continue
 
             _, img_encoded = cv2.imencode('.jpg', frame)
-
             image_data = img_encoded.tobytes()
-
-            response = requests.post(server_url, data=image_data,verify=False)
-    
+            response = requests.post(server_url, data=image_data, verify=False)
             print(response.text)
-    
-            cv2.imshow("upload_video", frame)
-    
-            if cv2.waitKey(40) & 0xFF == ord('q'):
-                break
 
     except Exception as e:
         error_message = f"Exception occurred: {e}"
