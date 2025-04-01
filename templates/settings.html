@@ -110,9 +110,6 @@
 			   lastOnlineTime = new Date(lastOnlineTime.getTime() -28800000);
 
             // 計算時間差異（以秒為單位）
-			console.log(device.device_name,":lastOnlineTime:",device.last_online_time);
-			console.log(device.device_name,":lastOnlineTime2:",lastOnlineTime);
-			console.log("TimeNow:",currentTime);
             var timeDifference = Math.floor((currentTime - lastOnlineTime) / 1000); 
 			
             // 根據時間差異顯示對應訊息

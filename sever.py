@@ -24,6 +24,8 @@ model = YOLO("best.pt")
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'YOUR_KEY'
+app.config['UPLOAD_FOLDER'] = 'photo' 
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 SERVER_IP = "YOUR_IP_ADDRESS"
 SERVER_PORT = "YOUR_PORT"
@@ -31,7 +33,7 @@ SERVER_PORT = "YOUR_PORT"
 device_ids = []
 
 db_config = {
-    'host': 'localhost',
+    'host': 'host.docker.internal',
     'user': 'root',
     'password': '', 
     'database': 'smoke' 
@@ -187,7 +189,9 @@ def realtime():
 @app.route('/records.html')
 def records():
     if check_login_data():
-        image_files = [f for f in os.listdir(image_folder)if f.endswith(".png") or f.endswith(".gif") ]
+        image_files = [
+            f for f in os.listdir(app.config['UPLOAD_FOLDER'])
+            if f.lower().endswith(".gif") ]
         return render_template('records.html', image_files=image_files)
     else:
         return redirect(url_for('login'))
