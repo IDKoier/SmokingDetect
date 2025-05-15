@@ -16,6 +16,7 @@ import io
 import mysql.connector
 import bcrypt
 import jwt
+import hashlib
 
 #YOLO model
 model = YOLO("best.pt")
@@ -33,11 +34,19 @@ SERVER_PORT = "YOUR_PORT"
 device_ids = []
 
 db_config = {
-    'host': 'host.docker.internal',
+    'host': 'localhost',
     'user': 'root',
     'password': '', 
     'database': 'smoke' 
 }
+
+#db_config = {
+#    'host': 'host.docker.internal',
+#    'user': 'root',
+#    'password': '', 
+#   'database': 'smoke' 
+#}
+
 connection = mysql.connector.connect(**db_config)
 if connection.is_connected():
     cursor = connection.cursor()
@@ -72,7 +81,6 @@ def process_and_display_image(device_id, image_queue,realtimes_queue):
     gif = []
     
     while True:
-        # 從佇列中獲取影像，等待直到影像可用
         image = image_queue.get()
 
         if image is not None:
@@ -86,8 +94,23 @@ def process_and_display_image(device_id, image_queue,realtimes_queue):
                     gif.append(im)
                 elif(ifSmoker==cooldownBetweenTwoTarget+howManyframeMadeGIF):
                     print("giflen=",len(gif))
-                    gif[0].save( "photo/" + datetime.datetime.now().strftime("%Y-%m-%d,%H-%M-%S,") + device_id + ".gif",save_all=True,append_images=gif[1:],duration=100,loop=0,disposal=0)
-                    gif.clear()
+                    first_frame_array = np.array(gif[0])
+                    hash_filename = calculate_sha256(first_frame_array)
+                    new_filename = f"{hash_filename}.gif"
+                    gif[0].save(
+                    f"photo/{new_filename}",
+                    save_all=True,
+                    append_images=gif[1:],
+                    duration=100,
+                    loop=0,
+                    disposal=0)
+                    timestamp = datetime.datetime.now()
+                    save_to_database(
+                    device_id=device_id,
+                    hash_filename=hash_filename,  
+                    recognition_time=timestamp
+                )
+                gif.clear()
             else:
                 if results[0].boxes:
                     if(results[0].boxes.conf[0]):
@@ -101,11 +124,28 @@ def process_and_display_image(device_id, image_queue,realtimes_queue):
                 ifSmoker = cooldownBetweenTwoTarget
                 
             realtimes_queue.put(im)
-
-            #cv2.imshow(f"YOLOv8 Tracking - Device {device_id}", annotated_frame)
-            if cv2.waitKey(1) & 0xFF == ord("q"):
-                break
             
+def calculate_sha256(image_array):
+    img_bytes = image_array.tobytes()
+    return hashlib.sha256(img_bytes).hexdigest()
+
+def save_to_database(device_id, hash_filename, recognition_time):
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO records (device_id, hash_filename, recognition_time) "
+            "VALUES (%s, %s, %s)",
+            (device_id, hash_filename, recognition_time)
+        )
+        conn.commit()
+    except Exception as e:
+        print(f"Database error: {e}")
+    finally:
+        if conn.is_connected():
+            cursor.close()
+            conn.close()
+
 @app.route('/api/login_data', methods=['POST'])
 def login_data():
     try:
@@ -216,6 +256,27 @@ def settings():
     else:
         return redirect(url_for('login'))
 
+@app.route('/save_device', methods=['POST'])
+def save_device():
+    data = request.get_json()
+    device_id = data.get('device_ID') 
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO records (device_id, hash_filename, recognition_time) "
+            "VALUES (%s, %s, %s)",
+            (device_id, hash_filename, recognition_time)
+        )
+        conn.commit()
+        return jsonify({'success': True, 'message': '設備資訊已保存'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        if conn.is_connected():
+            cursor.close()
+            conn.close()
+
 @app.route('/generate_script')
 def generate_script():
     device_ID = request.args.get("device_ID", "default_device").strip()
@@ -227,7 +288,7 @@ import logging
 import uuid
 
 def get_mac_address():
-    mac = ':'.join(['{{:02x}}'.format((uuid.getnode() >> elements) & 0xff) for elements in range(0, 2 * 6, 8)][::-1])
+    mac = ':'.join(['{:02x}'.format((uuid.getnode()   >> 8*i) & 0xff) for i in range(5, -1, -1)])
     return mac
     
 logging.basicConfig(

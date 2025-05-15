@@ -44,6 +44,15 @@
     <button onclick="downloadScript()">下載腳本</button>
             </div>
         </div>
+		<div id="confirmDialog" class="modal" style="display:none;">
+            <div class="modal-content">
+                <p>確定要新增設備： <span id="deviceIDDisplay"></span> 嗎？</p>
+                <div class="button-container">
+                    <button onclick="proceedDownload()">確認</button>
+                    <button onclick="cancelDownload()" class="cancel-btn">取消</button>
+                </div>
+            </div>
+		
 		<style>
     .form-container {
         max-width: 400px;
@@ -142,17 +151,55 @@
             noDevicesMessage.textContent = '目前沒有設備資料。';
             container.appendChild(noDevicesMessage);
         }
-	 function downloadScript() {
-        var deviceID = document.getElementById("deviceID").value.trim();
-        
-        if (deviceID === "") {
-            alert("請輸入設備 ID");
-            return;
-        }
-        
-        var downloadUrl = "/generate_script?device_ID=" + encodeURIComponent(deviceID);
-        window.location.href = downloadUrl;
-    }
+	  // 確認下載函數
+            function confirmAndDownload() {
+                selectedDeviceID = document.getElementById("deviceID").value.trim();
+                
+                if (selectedDeviceID === "") {
+                    alert("請輸入設備 ID");
+                    return;
+                }
+                
+                // 顯示確認對話框
+                document.getElementById("deviceIDDisplay").textContent = selectedDeviceID;
+                document.getElementById("confirmDialog").style.display = "block";
+            }
+            
+            // 取消下載
+            function cancelDownload() {
+                document.getElementById("confirmDialog").style.display = "none";
+                selectedDeviceID = '';
+            }
+            
+            // 確認後執行下載
+            function proceedDownload() {
+                document.getElementById("confirmDialog").style.display = "none";
+                
+                // 發送請求到後端，先儲存設備名稱
+                fetch('/save_device', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        device_ID: selectedDeviceID
+                    }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // 儲存成功後開始下載
+                        var downloadUrl = "/generate_script?device_ID=" + encodeURIComponent(selectedDeviceID);
+                        window.location.href = downloadUrl;
+                    } else {
+                        alert("儲存設備資訊失敗: " + data.message);
+                    }
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                    alert("發生錯誤，請稍後再試");
+                });
+            }
 </script>
 
     </main>

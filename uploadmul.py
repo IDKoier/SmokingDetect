@@ -14,7 +14,7 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-device_ID = "123"
+device_ID = "test_computer"
 device_MAC = get_mac_address()
 server_ip = "YOUR_IP_ADDRESS"
 server_port = "YOUR_PORT"

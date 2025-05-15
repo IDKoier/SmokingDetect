@@ -24,12 +24,10 @@
             <div class="row" id="image-container">
     </main>
 <script>
-		// 從後端插入的變數 window.devices 中獲取設備資料
     const devices = {{ devices | tojson }};
     const container = document.getElementById('image-container');
 
     devices.forEach(deviceID => {
-        // Create a container for each image and caption
         const imageContainer = document.createElement('div');
         imageContainer.classList.add('image-box');
 
@@ -44,16 +42,13 @@
             img.width = 640;
         };
 
-        // Create a paragraph element for the caption
         const caption = document.createElement('p');
         caption.classList.add('image-caption');
         caption.textContent = deviceID;
 
-        // Append the img and caption elements to the container
         imageContainer.appendChild(img);
         imageContainer.appendChild(caption);
 
-        // Append the container to the main container
         container.appendChild(imageContainer);
     });
 	</script>
