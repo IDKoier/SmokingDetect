@@ -33,6 +33,7 @@ SERVER_PORT = "YOUR_PORT"
 
 device_ids = []
 
+#測試用
 db_config = {
     'host': 'localhost',
     'user': 'root',
@@ -277,6 +278,48 @@ def save_device():
             cursor.close()
             conn.close()
 
+@app.route('/rename_device', methods=['POST'])
+def rename_device():
+    data = request.get_json()
+    old_device_id = data.get('old_device_ID') 
+    new_device_id = data.get('new_device_ID') 
+    print(old_device_id,new_device_id)
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor()
+        cursor.execute(
+        "UPDATE device SET device_name = %s WHERE device_name = %s",
+        (new_device_id, old_device_id)
+        )
+        conn.commit()
+        return jsonify({'success': True, 'message': '設備資訊已修改'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        if conn.is_connected():
+            cursor.close()
+            conn.close()
+
+@app.route('/delete_device', methods=['POST'])
+def delete_device():
+    data = request.get_json()
+    device_id = data.get('device_ID') 
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor()
+        cursor.execute(
+        "DELETE FROM device WHERE device_name = %s",
+            (device_id,)
+        )
+        conn.commit()
+        return jsonify({'success': True, 'message': '設備資訊已刪除'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        if conn.is_connected():
+            cursor.close()
+            conn.close()
+
 @app.route('/generate_script')
 def generate_script():
     device_ID = request.args.get("device_ID", "default_device").strip()
@@ -389,7 +432,6 @@ def video_stream(device_id):
     
 if __name__ == '__main__':
     
-    # 啟動一個影像處理進程，每個設備一個
     for device_id in device_ids:
         start_image_process(device_id, image_queues[device_id],realtimes_queues[device_id])
     

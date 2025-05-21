@@ -5,55 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>系統設定</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-	
-</head>
-<body>
-    <header>
-        <nav>
-            <ul>
-               <!-- <li><a href="home.html">首頁</a></li>-->
-                <li><a href="realtime.html">實時監控</a></li>
-                <li><a href="records.html">監控紀錄</a></li>
-                <li><a href="settings.html">系統設定</a></li>
-				<li><a href="login.html">管理員登入</a></li>
-				<!--<li><a href="test.html">偵測系統測試</a></li>-->
-            </ul>
-        </nav>
-    </header>
-    
-     <main>
-        <div class="settings-card">
-            <h2 class="settings-title">系統設定</h2>
-            
-            <!-- 設備管理部分 -->
-            <div class="settings-section">
-                <h3 class="section-title">設備管理</h3>
-					<div id="device-cards-container">
-            </div>
-            
-            <hr class="separator"> 
+	<style>
 
-            <!-- 新增管理員帳號部分 -->
-            <div class="settings-section">
-                <h3 class="section-title">帳號管理</h3>
-                <p>帳號管理</p>
-				<hr class="separator"> 
-				  <h3 class="section-title">腳本下載</h3>
-    <label for="deviceID">輸入設備 ID：</label>
-    <input type="text" id="deviceID" placeholder="請輸入設備 ID">
-    <button onclick="confirmAndDownload()">下載腳本</button>
-            </div>
-        </div>
-		<div id="confirmDialog" class="modal" style="display:none;">
-            <div class="modal-content">
-                <p>確定要新增設備： <span id="deviceIDDisplay"></span> 嗎？</p>
-                <div class="button-container">
-                    <button onclick="proceedDownload()">確認</button>
-                    <button onclick="cancelDownload()" class="cancel-btn">取消</button>
-                </div>
-            </div>
-		
-		<style>
     .form-container {
         max-width: 400px;
         margin: 20px auto;
@@ -97,79 +50,176 @@
     button:hover {
         background-color: #45a049;
     }
+
 </style>
+</head>
+<body>
+    <header>
+        <nav>
+            <ul>
+               <!-- <li><a href="home.html">首頁</a></li>-->
+                <li><a href="realtime.html">實時監控</a></li>
+                <li><a href="records.html">監控紀錄</a></li>
+                <li><a href="settings.html">系統設定</a></li>
+				<li><a href="login.html">管理員登入</a></li>
+				<!--<li><a href="test.html">偵測系統測試</a></li>-->
+            </ul>
+        </nav>
+    </header>
+    
+     <main>
+<div class="settings-card">
+            <h2 class="settings-title">系統設定</h2>
+            
+            <div class="settings-section">
+                <h3 class="section-title">設備管理</h3>
+                <div id="device-cards-container"></div>
+            </div>
+            
+            <hr class="separator"> 
+
+            <div class="settings-section">
+                <h3 class="section-title">帳號管理</h3>
+                <p>帳號管理</p>
+                <hr class="separator"> 
+                <h3 class="section-title">腳本下載</h3>
+                <label for="deviceID">輸入設備 ID：</label>
+                <input type="text" id="deviceID" placeholder="請輸入設備 ID">
+                <button onclick="confirmAndDownload()">下載腳本</button>
+            </div>
+        </div>
+
+        <!-- 確認對話框 -->
+        <div id="confirmDialog" class="modal">
+            <div class="modal-content">
+                <p>確定要新增設備：<span id="deviceIDDisplay"></span> 嗎？</p>
+                <div class="button-container">
+                    <button onclick="proceedDownload()">確認</button>
+                    <button onclick="cancelDownload()" class="cancel-btn">取消</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 修改設備名稱模態框 -->
+        <div id="renameModal" class="modal">
+            <div class="modal-content">
+                <h4>修改設備名稱</h4>
+                <input type="text" id="renameInput" placeholder="輸入新名稱">
+                <div class="button-container">
+                    <button onclick="confirmRename()">確認</button>
+                    <button onclick="closeModal('renameModal')" class="cancel-btn">取消</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 刪除設備模態框 -->
+        <div id="deleteModal" class="modal">
+            <div class="modal-content">
+                <p>確定要刪除此設備？</p>
+                <p id="deleteDeviceName" style="font-weight: bold;"></p>
+                <div class="button-container">
+                    <button onclick="confirmDelete()">確定刪除</button>
+                    <button onclick="closeModal('deleteModal')" class="cancel-btn">取消</button>
+                </div>
+            </div>
+        </div>
 		<script>
-   var devices = {{ devices | tojson }}; 
-        var container = document.getElementById('device-cards-container');
-		var currentTime = new Date();
-		
-        // 檢查 devices 是否有資料
-        if (devices && devices.length > 0) {
-            devices.forEach(function(device) {
-                // 為每一個設備建立一個卡片元素
-                var card = document.createElement('div');
-                card.classList.add('device-card');
-                
-                // 卡片內的設備名稱
-                var deviceName = document.createElement('h4');
-                deviceName.classList.add('device-name');
-                deviceName.textContent = device.device_name; // 設備名稱
+		var devices = {{ devices | tojson }}; 
+		var selectedDeviceID = '';
 
-               var lastOnlineTime = new Date(device.last_online_time);
-			   lastOnlineTime = new Date(lastOnlineTime.getTime() -28800000);
+function renderDevices() 
+{
+    var container = document.getElementById('device-cards-container');
+    container.innerHTML = ''; 
+    var currentTime = new Date();
 
-            // 計算時間差異（以秒為單位）
+    if (devices && devices.length > 0) {
+        devices.forEach(function(device) {
+            var card = document.createElement('div');
+            card.classList.add('device-card');
+            card.style.position = 'relative';
+            card.style.display = 'flex';
+            card.style.justifyContent = 'space-between';
+            card.style.alignItems = 'center';
+
+            var infoDiv = document.createElement('div');
+            var deviceName = document.createElement('h4');
+            deviceName.classList.add('device-name');
+            deviceName.textContent = device.device_name;
+
+            var lastOnlineTime = new Date(device.last_online_time);
+            lastOnlineTime = new Date(lastOnlineTime.getTime() - 28800000); // 時區調整
             var timeDifference = Math.floor((currentTime - lastOnlineTime) / 1000); 
-			
-            // 根據時間差異顯示對應訊息
             var onlineStatus = '';
             if (timeDifference < 10) {
                 onlineStatus = '目前正在線上';
             } else if (timeDifference < 60) {
                 onlineStatus = timeDifference + ' 秒前在線';
             } else if (timeDifference < 3600) {
-                var minutes = Math.floor(timeDifference / 60);
-                onlineStatus = minutes + ' 分鐘前在線';
+                onlineStatus = Math.floor(timeDifference / 60) + ' 分鐘前在線';
             } else {
                 onlineStatus = '最後上線時間: ' + device.last_online_time;
             }
-
-            // 卡片內的最後上線時間
             var onlineStatusElement = document.createElement('p');
             onlineStatusElement.classList.add('last-online-time');
-            onlineStatusElement.textContent = onlineStatus; // 顯示狀態訊息
+            onlineStatusElement.textContent = onlineStatus;
 
-                // 將設備名稱和最後上線時間插入到卡片中
-                card.appendChild(deviceName);
-                card.appendChild(onlineStatusElement);
+            infoDiv.appendChild(deviceName);
+            infoDiv.appendChild(onlineStatusElement);
 
-                // 將卡片插入到容器中
-                container.appendChild(card);
-            });
-        } else {
-            var noDevicesMessage = document.createElement('p');
-            noDevicesMessage.textContent = '目前沒有設備資料。';
-            container.appendChild(noDevicesMessage);
-        }
-	  // 確認下載函數
-            function confirmAndDownload() {
-                selectedDeviceID = document.getElementById("deviceID").value.trim();
+            // 按鈕
+            var actionsDiv = document.createElement('div');
+            actionsDiv.classList.add('device-actions');
+
+            var renameBtn = document.createElement('button');
+            renameBtn.textContent = '修改';
+            renameBtn.onclick = function () {
+				selectedDeviceID = device.device_name;
+                document.getElementById('renameInput').value = device.device_name;
+                showModal('renameModal');
+            };
+
+            var deleteBtn = document.createElement('button');
+            deleteBtn.textContent = '刪除';
+            deleteBtn.onclick = function () {
+                selectedDeviceID = device.device_name;
+                document.getElementById('deleteDeviceName').textContent = device.device_name;
+                showModal('deleteModal');
+            };
+
+            actionsDiv.appendChild(renameBtn);
+            actionsDiv.appendChild(deleteBtn);
+
+            card.appendChild(infoDiv);
+            card.appendChild(actionsDiv);
+            container.appendChild(card);
+        });
+    } else {
+        var noDevicesMessage = document.createElement('p');
+        noDevicesMessage.textContent = '目前沒有設備資料。';
+        container.appendChild(noDevicesMessage);
+    }
+}
+
+function confirmAndDownload() 
+{
+	selectedDeviceID = document.getElementById("deviceID").value.trim();
                 
-                if (selectedDeviceID === "") {
-                    alert("請輸入設備 ID");
-                    return;
-                }
-                
-                // 顯示確認對話框
-                document.getElementById("deviceIDDisplay").textContent = selectedDeviceID;
-                document.getElementById("confirmDialog").style.display = "block";
-            }
+	if (selectedDeviceID === "") 
+	{
+		alert("請輸入設備 ID");
+		return;
+	}
+	
+	document.getElementById("deviceIDDisplay").textContent = selectedDeviceID;
+	document.getElementById("confirmDialog").style.display = "flex";
+}
             
-            // 取消下載
-            function cancelDownload() {
-                document.getElementById("confirmDialog").style.display = "none";
-                selectedDeviceID = '';
-            }
+function cancelDownload() 
+{
+	document.getElementById("confirmDialog").style.display = "none";
+	selectedDeviceID = '';
+}
             
             // 確認後執行下載
             function proceedDownload() {
@@ -200,8 +250,70 @@
                     alert("發生錯誤，請稍後再試");
                 });
             }
-</script>
+			
+function showModal(id) {
+                document.getElementById(id).style.display = 'flex';
+            }
+function closeModal(id) {
+    document.getElementById(id).style.display = 'none';
+}
 
+function confirmRename() {
+    var newName = document.getElementById('renameInput').value.trim();
+    if (!newName) {
+        alert("請輸入新名稱");
+        return;
+    }
+
+    fetch('/rename_device', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            old_device_ID: selectedDeviceID,
+            new_device_ID: newName
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert('名稱修改成功');
+            location.reload();
+        } else {
+            alert('修改失敗：' + data.message);
+        }
+    });
+
+    closeModal('renameModal');
+}
+
+function confirmDelete() {
+    fetch('/delete_device', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device_ID: selectedDeviceID })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert('刪除成功');
+            location.reload();
+        } else {
+            alert('刪除失敗：' + data.message);
+        }
+    });
+
+    closeModal('deleteModal');
+}
+
+document.addEventListener('DOMContentLoaded', function() 
+{
+	renderDevices();
+	document.querySelectorAll('.modal').forEach(function(modal) 
+	{
+		modal.style.display = 'none';
+	});
+});
+</script>
     </main>
 </body>
 </html>
