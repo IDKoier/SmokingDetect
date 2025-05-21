@@ -41,7 +41,7 @@
 				  <h3 class="section-title">腳本下載</h3>
     <label for="deviceID">輸入設備 ID：</label>
     <input type="text" id="deviceID" placeholder="請輸入設備 ID">
-    <button onclick="downloadScript()">下載腳本</button>
+    <button onclick="confirmAndDownload()">下載腳本</button>
             </div>
         </div>
 		<div id="confirmDialog" class="modal" style="display:none;">
@@ -99,7 +99,7 @@
     }
 </style>
 		<script>
-   var devices = {{ devices | tojson }}; // 使用 Jinja2 將後端的 devices 轉換為 JavaScript 陣列
+   var devices = {{ devices | tojson }}; 
         var container = document.getElementById('device-cards-container');
 		var currentTime = new Date();
 		

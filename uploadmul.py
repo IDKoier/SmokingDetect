@@ -5,7 +5,7 @@ import logging
 import uuid
 
 def get_mac_address():
-    mac = ':'.join(['{:02x}'.format((uuid.getnode() >> elements) & 0xff) for elements in range(0, 2 * 6, 8)][::-1])
+    mac = ':'.join(['{:02x}'.format((uuid.getnode() >> 8*i) & 0xff) for i in range(5, -1, -1)])
     return mac
     
 logging.basicConfig(
@@ -14,7 +14,7 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-device_ID = "test_computer"
+device_ID = "123"
 device_MAC = get_mac_address()
 server_ip = "YOUR_IP_ADDRESS"
 server_port = "YOUR_PORT"

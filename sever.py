@@ -264,9 +264,9 @@ def save_device():
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO records (device_id, hash_filename, recognition_time) "
-            "VALUES (%s, %s, %s)",
-            (device_id, hash_filename, recognition_time)
+            "INSERT INTO device (device_name, mac_address, last_online_time) "
+            "VALUES (%s, NULL,%s)",
+            (device_id,'1970-01-01 00:00:00')
         )
         conn.commit()
         return jsonify({'success': True, 'message': '設備資訊已保存'})
@@ -288,7 +288,7 @@ import logging
 import uuid
 
 def get_mac_address():
-    mac = ':'.join(['{:02x}'.format((uuid.getnode()   >> 8*i) & 0xff) for i in range(5, -1, -1)])
+    mac = ':'.join(['{{:02x}}'.format((uuid.getnode() >> 8*i) & 0xff) for i in range(5, -1, -1)])
     return mac
     
 logging.basicConfig(
