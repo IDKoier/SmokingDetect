@@ -79,17 +79,53 @@
             <hr class="separator"> 
 
             <div class="settings-section">
-                <h3 class="section-title">帳號管理</h3>
-                <p>帳號管理</p>
-                <hr class="separator"> 
                 <h3 class="section-title">腳本下載</h3>
                 <label for="deviceID">輸入設備 ID：</label>
                 <input type="text" id="deviceID" placeholder="請輸入設備 ID">
                 <button onclick="confirmAndDownload()">下載腳本</button>
             </div>
-        </div>
 
-        <!-- 確認對話框 -->
+            <hr class="separator">
+
+            <div class="settings-section">
+                <h3 class="section-title">帳號管理</h3>
+                <div id="current-account-info">
+                    <h4>當前帳號: <span id="current-username"></span></h4>
+                    <div id="change-password-section">
+                        <h4>修改密碼</h4>
+                        <input type="password" id="current-password" placeholder="當前密碼">
+                        <input type="password" id="new-password" placeholder="新密碼">
+                        <input type="password" id="confirm-password" placeholder="確認新密碼">
+                        <button onclick="changePassword()">修改密碼</button>
+                    </div>
+                </div>
+                
+                <div id="admin-management-section" style="display: none;">
+                    <hr>
+                    <h4>管理員帳戶管理</h4>
+                    <div id="admin-list-container">
+                        <h5>管理員列表</h5>
+                        <table id="admin-list-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>使用者名稱</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="admin-action">
+                        <h5>新增管理員</h5>
+                        <input type="text" id="new-admin-username" placeholder="使用者名稱">
+                        <input type="password" id="new-admin-password" placeholder="密碼">
+                        <button onclick="addAdmin()">新增</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+	        <!-- 確認對話框 -->
         <div id="confirmDialog" class="modal">
             <div class="modal-content">
                 <p>確定要新增設備：<span id="deviceIDDisplay"></span> 嗎？</p>
@@ -122,7 +158,10 @@
                     <button onclick="closeModal('deleteModal')" class="cancel-btn">取消</button>
                 </div>
             </div>
-        </div>
+		</div>
+ </div>		
+
+		<script src="https://cdn.jsdelivr.net/npm/jwt-decode@3.1.2/build/jwt-decode.min.js"></script>
 		<script>
 		var devices = {{ devices | tojson }}; 
 		var selectedDeviceID = '';
@@ -241,6 +280,7 @@ function cancelDownload()
                         // 儲存成功後開始下載
                         var downloadUrl = "/generate_script?device_ID=" + encodeURIComponent(selectedDeviceID);
                         window.location.href = downloadUrl;
+						location.reload();
                     } else {
                         alert("儲存設備資訊失敗: " + data.message);
                     }
@@ -305,6 +345,22 @@ function confirmDelete() {
     closeModal('deleteModal');
 }
 
+function getCookie(name) 
+{
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+}
+
+function parseToken(token) 
+{
+    const payload = jwt_decode(token);
+    return {
+        id: payload.id,
+        username: payload.sub || payload.username, 
+    };
+}
+
 document.addEventListener('DOMContentLoaded', function() 
 {
 	renderDevices();
@@ -312,6 +368,24 @@ document.addEventListener('DOMContentLoaded', function()
 	{
 		modal.style.display = 'none';
 	});
+	
+	 try {
+        const token = getCookie('jwt_token');
+        if (!token) throw new Error('找不到 Token');
+        
+        const current_user = parseToken(token);
+        
+        document.getElementById('current-username').textContent = current_user.username;
+        
+        if (current_user.id==1) {
+            document.getElementById('change-password-section').style.display = 'none';
+            document.getElementById('admin-management-section').style.display = 'block';
+            loadAdminList();
+        }
+        
+    } catch (error) {
+        console.warn('用戶信息初始化失敗:', error.message);
+    }
 });
 </script>
     </main>

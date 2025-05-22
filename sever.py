@@ -160,7 +160,7 @@ def login_data():
         connection = mysql.connector.connect(**db_config)
         cursor = connection.cursor()
 
-        cursor.execute("SELECT name, password FROM admin WHERE name = %s", (username,))
+        cursor.execute("SELECT name, password,id FROM admin WHERE name = %s", (username,))
         result = cursor.fetchone()
 
         if result:
@@ -168,6 +168,7 @@ def login_data():
             if bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
                 token = jwt.encode({
                     'username': result[0],
+                    'id': result[2],
                     'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1) 
                 }, app.config['SECRET_KEY'], algorithm='HS256')
                 return jsonify({"message": "Login successful", "token": token})
