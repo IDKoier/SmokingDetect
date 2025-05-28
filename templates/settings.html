@@ -32,6 +32,15 @@
         box-sizing: border-box;
     }
 
+    input[type="password"] {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 15px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+
     .button-container {
         text-align: center;
     }
@@ -50,7 +59,42 @@
     button:hover {
         background-color: #45a049;
     }
+	
+#admin-list-table {
+    width: 100%;
+    border-collapse: collapse;
+}
 
+#admin-list-table th:nth-child(1) {  
+    width: 60%;
+}
+
+#admin-list-table th:nth-child(2) {  
+    width: 40%;
+}
+#admin-list-table th, #admin-list-table td {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+#admin-list-table th {
+    background-color: #f2f2f2;
+}
+
+#admin-list-table button {
+    padding: 5px 10px;
+    margin: 0 3px;
+    font-size: 14px;
+}
+
+.admin-action {
+    margin-top: 20px;
+}
+
+.admin-action input {
+    margin-bottom: 10px;
+}
 </style>
 </head>
 <body>
@@ -82,7 +126,7 @@
                 <h3 class="section-title">腳本下載</h3>
                 <label for="deviceID">輸入設備 ID：</label>
                 <input type="text" id="deviceID" placeholder="請輸入設備 ID">
-                <button onclick="confirmAndDownload()">下載腳本</button>
+                <button onclick="confirmAndDownload()">新增設備&下載腳本</button>
             </div>
 
             <hr class="separator">
@@ -108,7 +152,6 @@
                         <table id="admin-list-table">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
                                     <th>使用者名稱</th>
                                     <th>操作</th>
                                 </tr>
@@ -120,11 +163,12 @@
                         <h5>新增管理員</h5>
                         <input type="text" id="new-admin-username" placeholder="使用者名稱">
                         <input type="password" id="new-admin-password" placeholder="密碼">
-                        <button onclick="addAdmin()">新增</button>
+                        <button onclick="addAdmin()">新增管理員</button>
                     </div>
                 </div>
             </div>
         </div>
+		
 	        <!-- 確認對話框 -->
         <div id="confirmDialog" class="modal">
             <div class="modal-content">
@@ -327,11 +371,12 @@ function confirmRename() {
 }
 
 function confirmDelete() {
-    fetch('/delete_device', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ device_ID: selectedDeviceID })
-    })
+    fetch(`/delete_device/${encodeURIComponent(selectedDeviceID)}`, {
+  method: 'DELETE',
+  headers: {
+    'Authorization': `Bearer ${getCookie('jwt_token')}` // 添加认证
+  }
+})
     .then(res => res.json())
     .then(data => {
         if (data.success) {
@@ -359,6 +404,128 @@ function parseToken(token)
         id: payload.id,
         username: payload.sub || payload.username, 
     };
+}
+function loadAdminList() {
+    fetch('/admin/list', {
+        headers: {
+            'Authorization': `Bearer ${getCookie('jwt_token')}`
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            renderAdminList(data.admins);
+        } else {
+            alert('載入管理員列表失敗: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('發生錯誤，請稍後再試');
+    });
+}
+
+function confirmDeleteAdmin(adminName) {
+    if (!confirm(`確定要刪除管理員 "${adminName}" 嗎？`)) {
+        return;
+    }
+
+    fetch(`/admin/${encodeURIComponent(adminName)}`, {
+        method: 'DELETE',
+        headers: {
+            'Authorization': `Bearer ${getCookie('jwt_token')}`
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(err => { throw new Error(err.message); });
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            alert('管理員已刪除');
+            loadAdminList(); // 重新載入列表
+        } else {
+            throw new Error(data.message || '刪除失敗');
+        }
+    })
+    .catch(error => {
+        console.error('刪除錯誤:', error);
+        alert(`刪除失敗: ${error.message}`);
+    });
+}
+
+function addAdmin() {
+    const username = document.getElementById('new-admin-username').value.trim();
+    const password = document.getElementById('new-admin-password').value;
+    
+    if (!username || !password) {
+        alert('請填寫所有欄位');
+        return;
+    }
+    
+    if (!confirm(`確定要新增管理員 "${username}" 嗎？`)) {
+        return;
+    }
+    
+    fetch('/admin/add', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getCookie('jwt_token')}`
+        },
+        body: JSON.stringify({
+            username: username,
+            password: password
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('管理員新增成功');
+            document.getElementById('new-admin-username').value = '';
+            document.getElementById('new-admin-password').value = '';
+            loadAdminList();
+        } else {
+            alert('新增管理員失敗: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('發生錯誤，請稍後再試');
+    });
+}
+
+function renderAdminList(admins) {
+    const tbody = document.querySelector('#admin-list-table tbody');
+    tbody.innerHTML = '';
+    
+    admins.forEach(admin => {
+        const row = document.createElement('tr');
+        
+        const usernameCell = document.createElement('td');
+        usernameCell.textContent = admin;
+        row.appendChild(usernameCell);
+        
+        const actionsCell = document.createElement('td');
+        
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = '刪除帳號';
+            deleteBtn.onclick = () => confirmDeleteAdmin(admin);
+            actionsCell.appendChild(deleteBtn);
+            
+            actionsCell.appendChild(document.createTextNode(' '));
+            
+            const resetBtn = document.createElement('button');
+            resetBtn.textContent = '重置密碼';
+            resetBtn.onclick = () => resetAdminPassword(admin);
+            actionsCell.appendChild(resetBtn);
+
+        
+        row.appendChild(actionsCell);
+        tbody.appendChild(row);
+    });
 }
 
 document.addEventListener('DOMContentLoaded', function() 

@@ -200,6 +200,25 @@ def check_login_data():
     except jwt.InvalidTokenError:
         return False
 
+def check_root_admin():
+    
+    token = request.cookies.get('jwt_token')
+    
+    if not token:
+        return False
+
+    try:
+        decoded = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        return 'id' in decoded and decoded['id'] == 1
+        
+    except jwt.ExpiredSignatureError:
+        return False
+    except jwt.InvalidTokenError:
+        return False
+    except Exception as e:
+        app.logger.error(f"Root admin check error: {str(e)}")
+        return False
+
 def start_image_process(device_id, image_queue,realtimes_queue):
     image_process = multiprocessing.Process(target=process_and_display_image, args=(device_id, image_queue,realtimes_queue))
     image_process.daemon = True
@@ -301,21 +320,160 @@ def rename_device():
             cursor.close()
             conn.close()
 
-@app.route('/delete_device', methods=['POST'])
-def delete_device():
-    data = request.get_json()
-    device_id = data.get('device_ID') 
+@app.route('/delete_device/<string:device_name>', methods=['DELETE'])
+def delete_device(device_name):
     try:
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
         cursor.execute(
         "DELETE FROM device WHERE device_name = %s",
-            (device_id,)
+            (device_name,)
         )
+        if cursor.rowcount == 0:
+            return jsonify({'success': False, 'message': '設備不存在'}), 404
         conn.commit()
         return jsonify({'success': True, 'message': '設備資訊已刪除'})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
+    finally:
+        if conn.is_connected():
+            cursor.close()
+            conn.close()
+
+@app.route('/admin/list', methods=['GET'])
+def get_AdminList():
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor()
+        cursor.execute(
+        "SELECT name as username FROM admin")
+        results = cursor.fetchall()
+        return jsonify({'success': True, 'message': '成功查詢管理員列表','admins':results})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e),'admins': []}),500
+    finally:
+        if conn.is_connected():
+            cursor.close()
+            conn.close()
+
+@app.route('/admin/add', methods=['POST'])
+def add_New_Admin():
+    if not check_root_admin():
+        return jsonify({
+            "success": False,
+            "message": "需要 root 管理員權限"
+        }), 403
+    data = request.get_json()
+    username = data.get('username', '').strip() 
+    password = data.get('password', '').strip()
+    if not username or not password:
+        return jsonify({
+            "success": False,
+            "message": "使用者名稱和密碼不能為空"
+        }), 400
+    
+    ciphertext = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO admin (name, password) "
+            "VALUES (%s,%s)",
+            (username,ciphertext)
+        )
+        conn.commit()
+        return jsonify({'success': True, 'message': '成功新增管理員'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}),500
+    finally:
+        if conn.is_connected():
+            cursor.close()
+            conn.close()
+
+@app.route('/admin/<string:admin_name>', methods=['DELETE'])
+def delete_admin(admin_name):
+    if not check_root_admin():
+        return jsonify({
+            "success": False,
+            "message": "需要 root 管理員權限"
+        }), 403
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor(dictionary=True)
+        
+        cursor.execute("SELECT id FROM admin WHERE name = %s", (admin_name,))
+        admin = cursor.fetchone()
+        
+        if not admin:
+            return jsonify({
+                "success": False,
+                "message": "管理員不存在"
+            }), 404
+            
+        if admin['id'] == 1:
+            return jsonify({
+                "success": False,
+                "message": "無法刪除 root 管理員"
+            }), 403
+        
+        cursor.execute(
+        "DELETE FROM admin WHERE name = %s",
+            (admin_name,)
+        )
+
+        conn.commit()
+        return jsonify({
+            "success": True,
+            "message": "管理員已刪除"
+        })
+    except Exception as e:
+        return jsonify({"message": str(e)}), 500
+    finally:
+        if conn.is_connected():
+            cursor.close()
+            conn.close()
+
+@app.route('/admin/<string:admin_name>/root_change_password', methods=['PATCH'])
+def root_change_admin_password(admin_name):
+    if not check_root_admin():
+        return jsonify({
+            "success": False,
+            "message": "需要 root 管理員權限"
+        }), 403
+    data = request.get_json()
+    new_password = data.get('new_password')
+    if not new_password:
+        return jsonify({"success": False, "message": "新密碼不能為空"}), 400
+        
+    try:
+        ciphertext = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        
+        cursor.execute("SELECT id FROM admin WHERE name = %s", (admin_name,))
+        admin = cursor.fetchone()
+        
+        if not admin:
+            return jsonify({
+                "success": False,
+                "message": "管理員不存在"
+            }), 404
+            
+        if admin['id'] == 1:
+            return jsonify({
+                "success": False,
+                "message": "無法修改 root 管理員的密碼"
+            }), 403
+        
+        cursor.execute(
+            "UPDATE admin SET password = %s WHERE name = %s",
+            (ciphertext, admin_name)
+        )
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"message": str(e)}), 500
     finally:
         if conn.is_connected():
             cursor.close()
