@@ -33,20 +33,15 @@ SERVER_PORT = "YOUR_PORT"
 
 device_ids = []
 
-#測試用
 db_config = {
-    'host': 'localhost',
+    'host': 'host.docker.internal',
     'user': 'root',
     'password': '', 
-    'database': 'smoke' 
+   'database': 'smoke' 
 }
 
-#db_config = {
-#    'host': 'host.docker.internal',
-#    'user': 'root',
-#    'password': '', 
-#   'database': 'smoke' 
-#}
+#測試用
+#db_config['host'] = 'localhost'
 
 connection = mysql.connector.connect(**db_config)
 if connection.is_connected():

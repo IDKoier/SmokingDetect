@@ -374,7 +374,7 @@ function confirmDelete() {
     fetch(`/delete_device/${encodeURIComponent(selectedDeviceID)}`, {
   method: 'DELETE',
   headers: {
-    'Authorization': `Bearer ${getCookie('jwt_token')}` // 添加认证
+    'Authorization': `Bearer ${getCookie('jwt_token')}` 
   }
 })
     .then(res => res.json())
