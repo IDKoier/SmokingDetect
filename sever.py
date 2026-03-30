@@ -18,7 +18,6 @@ import bcrypt
 import jwt
 import hashlib
 
-#YOLO model
 model = YOLO("best.pt")
 
 #cap = cv2.VideoCapture(0)
@@ -59,12 +58,9 @@ connection.close()
 #    device_ids.append(deviceID["device"][0]["deviceID"])
 #    deviceID["device"].pop(0)
 
-
-# 使用 multiprocessing.Queue 來傳遞影像
 image_queues = {device_id: multiprocessing.Queue() for device_id in device_ids}
 realtimes_queues = {device_id: multiprocessing.Queue() for device_id in device_ids}
 
-# 影像處理和顯示的函數
 def process_and_display_image(device_id, image_queue,realtimes_queue):
 
     ifSmoker = 0
@@ -549,24 +545,23 @@ def get_image(filename):
 
 @app.route('/upload_video/<device_id>', methods=['POST'])
 def upload_video(device_id):
-    # 從 POST 請求中獲取上傳的影像資料
     
     image_data = request.data
     
     if image_data:
-        # 將接收到的二進制資料轉換成 NumPy 陣列
+
         nparr = np.frombuffer(image_data, np.uint8)
 
-        # 使用 OpenCV 解碼影像
+
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        # 放入影像佇列
+
         image_queues[device_id].put(image)
 
-        # 返回成功回應
+
         return '影像上傳成功'
 
-    # 如果未接收到影像資料，返回錯誤回應
+
     return '未收到影像資料', 400
 
 def get_image_frames(device_id):
