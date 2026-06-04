@@ -102,14 +102,19 @@ def process_and_display_image(device_id, image_queue,realtimes_queue):
                     hash_filename=hash_filename,  
                     recognition_time=timestamp
                 )
-                gif.clear()
+                    gif.clear()
             else:
-                if results[0].boxes:
-                    if(results[0].boxes.conf[0]):
-                        if(results[0].boxes.conf[0]>0.5):
+                if results[0].boxes and len(results[0].boxes.conf) > 0:
+                    boxes = results[0].boxes
+                    smoking_mask = boxes.cls == 2
+                    if smoking_mask.any():
+                        max_conf = boxes.conf[smoking_mask].max().item()
+                        if max_conf > 0.5:
                             ifSmoker += 1
                         else:
                             ifSmoker = 0
+                    else:
+                        ifSmoker = 0
             print("ifSmoker",ifSmoker)
             
             if(ifSmoker>=detectTimePerSmoker):

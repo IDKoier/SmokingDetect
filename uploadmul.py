@@ -20,9 +20,8 @@ server_ip = "YOUR_IP_ADDRESS"
 server_port = "YOUR_PORT"
 server_url = "https://" + server_ip + ":" + server_port + "/upload_video/" + device_ID
 
-cap = cv2.VideoCapture(0)
-
 while True:
+    cap = cv2.VideoCapture(0)
     try:
         while cap.isOpened():
             ret, frame = cap.read()
@@ -30,20 +29,21 @@ while True:
             if not ret:           
                 print("Webcam is not available.")
                 logging.error("Webcam is not available.")
-                time.sleep(5)
-                continue
+                break
 
             _, img_encoded = cv2.imencode('.jpg', frame)
             image_data = img_encoded.tobytes()
             response = requests.post(server_url, data=image_data, verify=False)
+            response.raise_for_status()
             print(response.text)
 
     except Exception as e:
         error_message = f"Exception occurred: {e}"
         print("Wait 5 seconds to restart.", error_message)
         logging.error(error_message) 
-        time.sleep(5)
 
     finally:
         cap.release()
         cv2.destroyAllWindows()
+
+    time.sleep(5)
