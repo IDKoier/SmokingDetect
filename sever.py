@@ -17,6 +17,7 @@ import mysql.connector
 import bcrypt
 import jwt
 import hashlib
+from collections import deque
 
 model = YOLO("best.pt")
 
@@ -32,7 +33,8 @@ SERVER_PORT = "YOUR_PORT"
 
 device_ids = []
 
-db_config = {
+db_config = 
+{
     'host': 'host.docker.internal',
     'user': 'root',
     'password': '', 
@@ -63,11 +65,11 @@ realtimes_queues = {device_id: multiprocessing.Queue() for device_id in device_i
 
 def process_and_display_image(device_id, image_queue,realtimes_queue):
 
-    ifSmoker = 0
+    ifSmoker = deque(maxlen=30)
     
     #10 photos per second
-    detectTimePerSmoker = 20
-    cooldownBetweenTwoTarget = -600
+    cooldown = 0
+    cooldownBetweenTwoTarget = 600
     howManyframeMadeGIF = 100
     
     gif = []
@@ -80,12 +82,11 @@ def process_and_display_image(device_id, image_queue,realtimes_queue):
             annotated_frame = results[0].plot()
             im = Image.fromarray(annotated_frame[..., ::-1])
             
-            if(ifSmoker<0):
-                ifSmoker += 1
-                if(ifSmoker<cooldownBetweenTwoTarget+howManyframeMadeGIF):
+            if(cooldown>0):
+                cooldown -= 1
+                if(cooldown>cooldownBetweenTwoTarget-howManyframeMadeGIF):
                     gif.append(im)
-                elif(ifSmoker==cooldownBetweenTwoTarget+howManyframeMadeGIF):
-                    print("giflen=",len(gif))
+                elif(cooldown==cooldownBetweenTwoTarget-howManyframeMadeGIF):
                     first_frame_array = np.array(gif[0])
                     hash_filename = calculate_sha256(first_frame_array)
                     new_filename = f"{hash_filename}.gif"
@@ -100,27 +101,28 @@ def process_and_display_image(device_id, image_queue,realtimes_queue):
                     save_to_database(
                     device_id=device_id,
                     hash_filename=hash_filename,  
-                    recognition_time=timestamp
-                )
+                    recognition_time=timestamp)
                     gif.clear()
             else:
+                isSmokingThisFrame = False
                 if results[0].boxes and len(results[0].boxes.conf) > 0:
                     boxes = results[0].boxes
                     smoking_mask = boxes.cls == 2
                     if smoking_mask.any():
                         max_conf = boxes.conf[smoking_mask].max().item()
                         if max_conf > 0.5:
-                            ifSmoker += 1
-                        else:
-                            ifSmoker = 0
-                    else:
-                        ifSmoker = 0
-            print("ifSmoker",ifSmoker)
-            
-            if(ifSmoker>=detectTimePerSmoker):
-                ifSmoker = cooldownBetweenTwoTarget
+                            isSmokingThisFrame = True
+                            
+                if isSmokingThisFrame:
+                    ifSmoker.append(1)
+                else:
+                    ifSmoker.append(0)
+                    
+                if sum(ifSmoker)>=27:
+                    cooldown = cooldownBetweenTwoTarget
+                    ifSmoker.clear()
                 
-            realtimes_queue.put(im)
+        realtimes_queue.put(im)
             
 def calculate_sha256(image_array):
     img_bytes = image_array.tobytes()
@@ -557,15 +559,11 @@ def upload_video(device_id):
 
         nparr = np.frombuffer(image_data, np.uint8)
 
-
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
 
         image_queues[device_id].put(image)
 
-
         return '影像上傳成功'
-
 
     return '未收到影像資料', 400
 

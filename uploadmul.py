@@ -21,8 +21,8 @@ server_port = "YOUR_PORT"
 server_url = "https://" + server_ip + ":" + server_port + "/upload_video/" + device_ID
 
 while True:
-    cap = cv2.VideoCapture(0)
     try:
+        cap = cv2.VideoCapture(0)
         while cap.isOpened():
             ret, frame = cap.read()
 
