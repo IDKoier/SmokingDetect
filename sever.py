@@ -78,14 +78,11 @@ def process_and_display_image(device_id, image_queue,realtimes_queue):
         image = image_queue.get()
 
         if image is not None:
-            results = model.track(image, conf=0.3, persist=True)
-            annotated_frame = results[0].plot()
-            im = Image.fromarray(annotated_frame[..., ::-1])
             
             if(cooldown>0):
                 cooldown -= 1
                 if(cooldown>cooldownBetweenTwoTarget-howManyframeMadeGIF):
-                    gif.append(im)
+                    gif.append(image)
                 elif(cooldown==cooldownBetweenTwoTarget-howManyframeMadeGIF):
                     first_frame_array = np.array(gif[0])
                     hash_filename = calculate_sha256(first_frame_array)
@@ -104,6 +101,9 @@ def process_and_display_image(device_id, image_queue,realtimes_queue):
                     recognition_time=timestamp)
                     gif.clear()
             else:
+                results = model.track(image, conf=0.3, persist=True)
+                annotated_frame = results[0].plot()
+                image = Image.fromarray(annotated_frame[..., ::-1])
                 isSmokingThisFrame = False
                 if results[0].boxes and len(results[0].boxes.conf) > 0:
                     boxes = results[0].boxes
@@ -122,7 +122,7 @@ def process_and_display_image(device_id, image_queue,realtimes_queue):
                     cooldown = cooldownBetweenTwoTarget
                     ifSmoker.clear()
                 
-        realtimes_queue.put(im)
+        realtimes_queue.put(image)
             
 def calculate_sha256(image_array):
     img_bytes = image_array.tobytes()
