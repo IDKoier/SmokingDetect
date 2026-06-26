@@ -1,4 +1,5 @@
 from flask import Flask, request,render_template,send_from_directory,Response, jsonify, redirect, url_for,send_file
+from functools import wraps
 import cv2
 import numpy as np
 import multiprocessing
@@ -33,8 +34,7 @@ SERVER_PORT = "YOUR_PORT"
 
 device_ids = []
 
-db_config = 
-{
+db_config = {
     'host': 'host.docker.internal',
     'user': 'root',
     'password': '', 
@@ -62,6 +62,8 @@ connection.close()
 
 image_queues = {device_id: multiprocessing.Queue() for device_id in device_ids}
 realtimes_queues = {device_id: multiprocessing.Queue() for device_id in device_ids}
+
+image_folder = "photo"
 
 def process_and_display_image(device_id, image_queue,realtimes_queue):
 
@@ -133,7 +135,7 @@ def save_to_database(device_id, hash_filename, recognition_time):
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO records (device_id, hash_filename, recognition_time) "
+            "INSERT INTO record (device_id, hash_filename, recognition_time) "
             "VALUES (%s, %s, %s)",
             (device_id, hash_filename, recognition_time)
         )
@@ -184,20 +186,31 @@ def login_data():
         if connection:
             connection.close()
 
-def check_login_data():
-    token = request.cookies.get('jwt_token')
+def login_required(f):
+    @wraps(f)
+    def check_login_data(*args, **kwargs):
+        token = request.cookies.get('jwt_token')
+        isApiRequest = request.path.startswith('/api/')
+        if not token:
+            if isApiRequest:
+                return jsonify({"success": False, "message": "未登入"}), 401
+            else:
+                return redirect(url_for('login'))
+        try:
+            jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            return f(*args, **kwargs)
+        except jwt.ExpiredSignatureError:
+            if isApiRequest:
+                return jsonify({"success": False, "message": "認證已過期"}), 401
+            else:
+                return redirect(url_for('login'))
+        except jwt.InvalidTokenError:
+            if isApiRequest:
+                return jsonify({"success": False, "message": "認證無效"}), 401
+            else:
+                return redirect(url_for('login'))
+    return check_login_data
     
-    if not token:
-        return False
-
-    try:
-        jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-        return True
-    except jwt.ExpiredSignatureError:
-        return False
-    except jwt.InvalidTokenError:
-        return False
-
 def check_root_admin():
     
     token = request.cookies.get('jwt_token')
@@ -222,60 +235,109 @@ def start_image_process(device_id, image_queue,realtimes_queue):
     image_process.daemon = True
     image_process.start()
 
-image_folder = "photo"
-
 @app.route('/')
+@login_required
 def default():
-    if check_login_data():
-        return render_template('realtime.html', devices=device_ids)
-    else:
-        return redirect(url_for('login'))
+    return render_template('realtime.html', devices=device_ids)
+
 
 @app.route('/home.html')
+@login_required
 def home():
-    if check_login_data():
        return render_template('home.html')
-    else:
-        return redirect(url_for('login'))
      
 @app.route('/realtime.html')
+@login_required
 def realtime():
-    if check_login_data():
-        return render_template('realtime.html', devices=device_ids)
-    else:
-        return redirect(url_for('login'))
+    return render_template('realtime.html', devices=device_ids)
      
 @app.route('/records.html')
+@login_required
 def records():
-    if check_login_data():
-        image_files = [
-            f for f in os.listdir(app.config['UPLOAD_FOLDER'])
-            if f.lower().endswith(".gif") ]
-        return render_template('records.html', image_files=image_files)
-    else:
-        return redirect(url_for('login'))
+    return render_template('records.html')
+
+
+@app.route('/api/search_device', methods=['GET'])
+@login_required
+def search_device():
+    device_id = request.args.get('device_id', default=None, type=str)
+    time_range = request.args.get('time', default=None, type=str)
+    page = request.args.get('page', default=1, type=int)
+    if page < 1:
+        page = 1
+    per_page = 50
+    offset = (page - 1) * per_page
+    
+    query = """
+    SELECT d.device_name, r.hash_filename, r.recognition_time 
+    FROM record r
+    JOIN device d ON r.device_id = d.id
+"""
+    where_clauses = []
+    params = []
+    
+    if device_id is not None:
+        where_clauses.append("r.device_id = %s")
+        params.append(device_id)
+    else: 
+        match time_range:
+            case "aHour":
+                where_clauses.append("r.recognition_time >= NOW() - INTERVAL 1 HOUR")
+            case "sixHour":
+                where_clauses.append("r.recognition_time >= NOW() - INTERVAL 6 HOUR")
+            case "aDay":
+                where_clauses.append("r.recognition_time >= NOW() - INTERVAL 1 DAY")
+            case "aWeek":
+                where_clauses.append("r.recognition_time >= NOW() - INTERVAL 1 WEEK")
+            case "aMonth":
+                where_clauses.append("r.recognition_time >= NOW() - INTERVAL 1 MONTH")
+            case _:
+                pass
+                
+    if where_clauses:
+        query += " WHERE " + " AND ".join(where_clauses)
+    query += " ORDER BY recognition_time DESC LIMIT %s OFFSET %s"
+    params.extend([per_page, offset])
+                
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(query, tuple(params))
+        results = cursor.fetchall()
+        formatted_results = []
+        for row in results:
+            if isinstance(row['recognition_time'], datetime.datetime):
+                row['recognition_time'] = row['recognition_time'].strftime('%Y-%m-%d %H:%M:%S')
+            formatted_results.append(row)
+        return jsonify({"success": True, "data": formatted_results})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        if conn.is_connected():
+            cursor.close()
+            conn.close()
 
 @app.route('/settings.html')
+@login_required
 def settings():
-    if check_login_data():
-        connection = mysql.connector.connect(**db_config)
-        if connection.is_connected():
-            cursor = connection.cursor()
-            cursor.execute("SELECT device_name,last_online_time FROM device")
-            results = cursor.fetchall()
-            devices = []
-            for row in results:
-                devices.append({
-                    'device_name': row[0], 
-                    'last_online_time': row[1]
-                })
-            cursor.close()
-            connection.close()
-        return render_template('settings.html',devices=devices)
-    else:
-        return redirect(url_for('login'))
+    connection = mysql.connector.connect(**db_config)
+    if connection.is_connected():
+        cursor = connection.cursor()
+        cursor.execute("SELECT device_name,last_online_time FROM device")
+        results = cursor.fetchall()
+        devices = []
+        for row in results:
+            devices.append({
+                'device_name': row[0], 
+                'last_online_time': row[1]
+            })
+        cursor.close()
+        connection.close()
+    return render_template('settings.html',devices=devices)
+
 
 @app.route('/save_device', methods=['POST'])
+@login_required
 def save_device():
     data = request.get_json()
     device_id = data.get('device_ID') 
@@ -297,6 +359,7 @@ def save_device():
             conn.close()
 
 @app.route('/rename_device', methods=['POST'])
+@login_required
 def rename_device():
     data = request.get_json()
     old_device_id = data.get('old_device_ID') 
@@ -319,6 +382,7 @@ def rename_device():
             conn.close()
 
 @app.route('/delete_device/<string:device_name>', methods=['DELETE'])
+@login_required
 def delete_device(device_name):
     try:
         conn = mysql.connector.connect(**db_config)
@@ -339,6 +403,7 @@ def delete_device(device_name):
             conn.close()
 
 @app.route('/admin/list', methods=['GET'])
+@login_required
 def get_AdminList():
     try:
         conn = mysql.connector.connect(**db_config)
@@ -355,6 +420,7 @@ def get_AdminList():
             conn.close()
 
 @app.route('/admin/add', methods=['POST'])
+@login_required
 def add_New_Admin():
     if not check_root_admin():
         return jsonify({
@@ -390,6 +456,7 @@ def add_New_Admin():
             conn.close()
 
 @app.route('/admin/<string:admin_name>', methods=['DELETE'])
+@login_required
 def delete_admin(admin_name):
     if not check_root_admin():
         return jsonify({
@@ -433,6 +500,7 @@ def delete_admin(admin_name):
             conn.close()
 
 @app.route('/admin/<string:admin_name>/root_change_password', methods=['PATCH'])
+@login_required
 def root_change_admin_password(admin_name):
     if not check_root_admin():
         return jsonify({
@@ -446,7 +514,7 @@ def root_change_admin_password(admin_name):
         
     try:
         ciphertext = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        conn = get_db_connection()
+        conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor(dictionary=True)
         
         cursor.execute("SELECT id FROM admin WHERE name = %s", (admin_name,))
@@ -478,6 +546,7 @@ def root_change_admin_password(admin_name):
             conn.close()
 
 @app.route('/generate_script')
+@login_required
 def generate_script():
     device_ID = request.args.get("device_ID", "default_device").strip()
 
@@ -507,29 +576,31 @@ cap = cv2.VideoCapture(0)
 
 while True:
     try:
+        cap = cv2.VideoCapture(0)
         while cap.isOpened():
             ret, frame = cap.read()
 
             if not ret:           
                 print("Webcam is not available.")
                 logging.error("Webcam is not available.")
-                time.sleep(5)
-                continue
+                break
 
             _, img_encoded = cv2.imencode('.jpg', frame)
             image_data = img_encoded.tobytes()
             response = requests.post(server_url, data=image_data, verify=False)
+            response.raise_for_status()
             print(response.text)
 
     except Exception as e:
-        error_message = f"Exception occurred: {{e}}"
+        error_message = f"Exception occurred: {e}"
         print("Wait 5 seconds to restart.", error_message)
         logging.error(error_message) 
-        time.sleep(5)
 
     finally:
         cap.release()
         cv2.destroyAllWindows()
+
+    time.sleep(5)
 '''
 
     script_path = os.path.join(os.getcwd(), "uploadmul.py")
@@ -543,10 +614,12 @@ def login():
     return render_template('login.html')
      
 @app.route('/test.html')
+@login_required
 def test():
     return render_template('test.html')
 
 @app.route('/images/<path:filename>')
+@login_required
 def get_image(filename):
     return send_from_directory(image_folder, filename)
 
@@ -569,9 +642,8 @@ def upload_video(device_id):
 
 def get_image_frames(device_id):
      while True:
-        if (realtimes_queues[device_id].get()) is not None:
-            image_data = realtimes_queues[device_id].get()
-            print(image_data)
+        image_data = realtimes_queues[device_id].get()
+        if (image_data) is not None:
             im_data = np.array(image_data)
             im_data_rgb = cv2.cvtColor(im_data, cv2.COLOR_BGR2RGB)
             _, img_encoded = cv2.imencode('.jpg', im_data_rgb)
@@ -579,6 +651,7 @@ def get_image_frames(device_id):
             yield (b'--frame\r\n'b'Content-Type: image/jpeg\r\n\r\n' + image_data_restored + b'\r\n')
 
 @app.route('/api/stream/<device_id>')
+@login_required
 def video_stream(device_id):
     return Response(get_image_frames(device_id), mimetype='multipart/x-mixed-replace; boundary=frame')
     
