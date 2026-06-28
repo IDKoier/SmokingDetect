@@ -19,4 +19,4 @@ COPY . .
 
 VOLUME /app/photo
 
-CMD ["python3", "sever.py"]
+CMD ["python3", "server.py"]

@@ -32,8 +32,6 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 SERVER_IP = "YOUR_IP_ADDRESS"
 SERVER_PORT = "YOUR_PORT"
 
-device_ids = []
-
 db_config = {
     'host': 'host.docker.internal',
     'user': 'root',
@@ -42,15 +40,21 @@ db_config = {
 }
 
 #測試用
-#db_config['host'] = 'localhost'
+db_config['host'] = 'localhost'
+
+device_ids = []
+device_db_mapping = {}
 
 connection = mysql.connector.connect(**db_config)
 if connection.is_connected():
     cursor = connection.cursor()
-    cursor.execute("SELECT device_name FROM device")
+    cursor.execute("SELECT id, device_name FROM device")
     results = cursor.fetchall()
     for row in results:
-        device_ids.append(row[0])
+        db_id = row[0]
+        device_name = row[1]
+        device_ids.append(device_name)
+        device_db_mapping[device_name] = db_id
 cursor.close()
 connection.close()
 
@@ -61,11 +65,11 @@ connection.close()
 #    deviceID["device"].pop(0)
 
 image_queues = {device_id: multiprocessing.Queue() for device_id in device_ids}
-realtimes_queues = {device_id: multiprocessing.Queue() for device_id in device_ids}
+realtimes_queues = {device_id: multiprocessing.Queue(maxsize=30) for device_id in device_ids}
 
 image_folder = "photo"
 
-def process_and_display_image(device_id, image_queue,realtimes_queue):
+def process_and_display_image(device_id, image_queue, realtimes_queue, db_id):
 
     ifSmoker = deque(maxlen=30)
     
@@ -84,7 +88,9 @@ def process_and_display_image(device_id, image_queue,realtimes_queue):
             if(cooldown>0):
                 cooldown -= 1
                 if(cooldown>cooldownBetweenTwoTarget-howManyframeMadeGIF):
-                    gif.append(image)
+                    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                    pil_image = Image.fromarray(image_rgb)
+                    gif.append(pil_image)
                 elif(cooldown==cooldownBetweenTwoTarget-howManyframeMadeGIF):
                     first_frame_array = np.array(gif[0])
                     hash_filename = calculate_sha256(first_frame_array)
@@ -98,32 +104,35 @@ def process_and_display_image(device_id, image_queue,realtimes_queue):
                     disposal=0)
                     timestamp = datetime.datetime.now()
                     save_to_database(
-                    device_id=device_id,
+                    device_id=db_id,
                     hash_filename=hash_filename,  
                     recognition_time=timestamp)
                     gif.clear()
             else:
-                results = model.track(image, conf=0.3, persist=True)
-                annotated_frame = results[0].plot()
-                image = Image.fromarray(annotated_frame[..., ::-1])
+                results = model.track(image, conf=0.3, persist=True, classes=[2])
+                image = results[0].plot()
                 isSmokingThisFrame = False
                 if results[0].boxes and len(results[0].boxes.conf) > 0:
                     boxes = results[0].boxes
-                    smoking_mask = boxes.cls == 2
-                    if smoking_mask.any():
-                        max_conf = boxes.conf[smoking_mask].max().item()
-                        if max_conf > 0.5:
+                    max_conf = boxes.conf.max().item()
+                    if max_conf > 0.7:
                             isSmokingThisFrame = True
                             
                 if isSmokingThisFrame:
                     ifSmoker.append(1)
                 else:
                     ifSmoker.append(0)
-                    
+                print('ifSmoker=',sum(ifSmoker))
                 if sum(ifSmoker)>=27:
                     cooldown = cooldownBetweenTwoTarget
                     ifSmoker.clear()
                 
+        if realtimes_queue.full():
+            try:
+                realtimes_queue.get_nowait()
+            except:
+                pass
+
         realtimes_queue.put(image)
             
 def calculate_sha256(image_array):
@@ -230,8 +239,8 @@ def check_root_admin():
         app.logger.error(f"Root admin check error: {str(e)}")
         return False
 
-def start_image_process(device_id, image_queue,realtimes_queue):
-    image_process = multiprocessing.Process(target=process_and_display_image, args=(device_id, image_queue,realtimes_queue))
+def start_image_process(device_id, image_queue, realtimes_queue, db_id):
+    image_process = multiprocessing.Process(target=process_and_display_image, args=(device_id, image_queue, realtimes_queue, db_id))
     image_process.daemon = True
     image_process.start()
 
@@ -644,9 +653,7 @@ def get_image_frames(device_id):
      while True:
         image_data = realtimes_queues[device_id].get()
         if (image_data) is not None:
-            im_data = np.array(image_data)
-            im_data_rgb = cv2.cvtColor(im_data, cv2.COLOR_BGR2RGB)
-            _, img_encoded = cv2.imencode('.jpg', im_data_rgb)
+            _, img_encoded = cv2.imencode('.jpg', image_data)
             image_data_restored = img_encoded.tobytes()
             yield (b'--frame\r\n'b'Content-Type: image/jpeg\r\n\r\n' + image_data_restored + b'\r\n')
 
@@ -658,7 +665,7 @@ def video_stream(device_id):
 if __name__ == '__main__':
     
     for device_id in device_ids:
-        start_image_process(device_id, image_queues[device_id],realtimes_queues[device_id])
+        start_image_process(device_id, image_queues[device_id], realtimes_queues[device_id], device_db_mapping[device_id])
     
     app.run(debug=False, host='0.0.0.0', port=SERVER_PORT,ssl_context=("cert/server.crt", "cert/server.key"))
 

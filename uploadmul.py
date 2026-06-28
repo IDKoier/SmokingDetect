@@ -22,7 +22,7 @@ server_url = "https://" + server_ip + ":" + server_port + "/upload_video/" + dev
 
 while True:
     try:
-        cap = cv2.VideoCapture(0)
+        cap = cv2.VideoCapture(0,cv2.CAP_V4L2)
         while cap.isOpened():
             ret, frame = cap.read()
 
@@ -33,9 +33,8 @@ while True:
 
             _, img_encoded = cv2.imencode('.jpg', frame)
             image_data = img_encoded.tobytes()
-            response = requests.post(server_url, data=image_data, verify=False)
+            response = requests.post(server_url, data=image_data, verify=False, timeout=3)
             response.raise_for_status()
-            print(response.text)
 
     except Exception as e:
         error_message = f"Exception occurred: {e}"
@@ -44,6 +43,5 @@ while True:
 
     finally:
         cap.release()
-        cv2.destroyAllWindows()
 
     time.sleep(5)
