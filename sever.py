@@ -109,7 +109,7 @@ def process_and_display_image(device_id, image_queue, realtimes_queue, db_id):
                     recognition_time=timestamp)
                     gif.clear()
             else:
-                results = model.track(image, conf=0.3, persist=True, classes=[2])
+                results = model.track(image, conf=0.3, persist=True, classes=[2], device=0)
                 image = results[0].plot()
                 isSmokingThisFrame = False
                 if results[0].boxes and len(results[0].boxes.conf) > 0:
@@ -263,18 +263,18 @@ def realtime():
 @app.route('/records.html')
 @login_required
 def records():
-    return render_template('records.html')
+    return render_template('records.html', devices=device_ids)
 
 
 @app.route('/api/search_device', methods=['GET'])
 @login_required
 def search_device():
-    device_id = request.args.get('device_id', default=None, type=str)
+    device_name = request.args.get('device_name', default=None, type=str)
     time_range = request.args.get('time', default=None, type=str)
     page = request.args.get('page', default=1, type=int)
     if page < 1:
         page = 1
-    per_page = 50
+    per_page = 5
     offset = (page - 1) * per_page
     
     query = """
@@ -285,9 +285,9 @@ def search_device():
     where_clauses = []
     params = []
     
-    if device_id is not None:
-        where_clauses.append("r.device_id = %s")
-        params.append(device_id)
+    if device_name is not None:
+        where_clauses.append("d.device_name = %s")
+        params.append(device_name)
     else: 
         match time_range:
             case "aHour":
@@ -601,7 +601,7 @@ while True:
             print(response.text)
 
     except Exception as e:
-        error_message = f"Exception occurred: {e}"
+        error_message = f"Exception occurred: {{e}}"
         print("Wait 5 seconds to restart.", error_message)
         logging.error(error_message) 
 
@@ -632,6 +632,7 @@ def test():
 def get_image(filename):
     return send_from_directory(image_folder, filename)
 
+last_online_update = {}
 @app.route('/upload_video/<device_id>', methods=['POST'])
 def upload_video(device_id):
     
@@ -640,11 +641,25 @@ def upload_video(device_id):
     if image_data:
 
         nparr = np.frombuffer(image_data, np.uint8)
-
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
         image_queues[device_id].put(image)
-
+        now = time.time()
+        if now - last_online_update.get(device_id, 0) >= 60:
+            last_online_update[device_id] = now
+            try:
+                conn = mysql.connector.connect(**db_config)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE device SET last_online_time = %s WHERE device_name = %s",
+                    (datetime.datetime.now(), device_id)
+                )
+                conn.commit()
+            except Exception as e:
+                print(f"更新 last_online_time 失敗: {e}")
+            finally:
+                if conn.is_connected():
+                    cursor.close()
+                    conn.close()
         return '影像上傳成功'
 
     return '未收到影像資料', 400

@@ -17,7 +17,7 @@
                 </ul>
         </nav>
     </header>
-    
+    <div class="content-wrapper"> 
     <aside>
         <h2>查詢選項</h2>
         <form>
@@ -36,24 +36,28 @@
                 <li>
                    <div id="location-toggle">依地點查詢：</div>
                     <ul id="location-options" class="hidden-options">
-                        </ul>
+        {% for device in devices %}
+        <li><div class="loc-option" style="cursor: pointer;">{{ device }}</div></li>
+        {% endfor %}
+        <li><div class="loc-option" id="loc-all-btn" style="cursor: pointer;">總覽</div></li>
+    </ul>
                 </li>
             </ul>
         </form>
     </aside>
 
     <main>
-        <div class="note-container" id="note-container">
-            <p style="color: white; padding: 20px;">載入中...</p>
-        </div>
-        
-        <div id="pagination-controls" style="display: flex; justify-content: center; gap: 20px; margin-top: 20px; padding-bottom: 20px;">
-            <button id="prev-page" style="padding: 5px 15px; cursor: pointer; display: none;">上一頁</button>
-            <span id="page-indicator" style="color: white; line-height: 30px;"></span>
-            <button id="next-page" style="padding: 5px 15px; cursor: pointer; display: none;">下一頁</button>
-        </div>
-    </main>
-
+    <div class="note-container" id="note-container">
+        <p style="color: white; padding: 20px;">載入中...</p>
+    </div>
+    
+    <div id="pagination-controls">
+        <button id="prev-page">上一頁</button>
+        <span id="page-indicator"></span>
+        <button id="next-page">下一頁</button>
+    </div>
+</main>
+</div>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             // 系統狀態變數
@@ -71,6 +75,18 @@
                 "近一個月": "aMonth",
                 "總覽": "all"
             };
+
+const locOptions = document.querySelectorAll('.loc-option');
+locOptions.forEach(function (option) {
+    option.addEventListener('click', function () {
+        const selectedText = this.textContent;
+        // 如果點擊的是總覽，就設為 null；否則設為該設備名稱
+        currentDevice = (selectedText === '總覽') ? null : selectedText;
+        currentPage = 1;
+        fetchRecords();
+    });
+});
+
 
             const timeOptions = document.querySelectorAll('#time-options div');
             timeOptions.forEach(function (option) {
@@ -96,7 +112,7 @@
             // 3. 核心抓取資料函數
             function fetchRecords() {
                 const container = document.getElementById('note-container');
-                container.innerHTML = '<p style="color: white; padding: 20px;">資料載入中...</p>';
+                container.innerHTML = '<p style="color: black; padding: 20px; font-size: 1.2rem;">資料載入中...</p>';
 
                 // 組合 URL 與參數
                 let url = `/api/search_device?page=${currentPage}`;
@@ -120,7 +136,6 @@
                     if (res && res.success) {
                         renderNotes(res.data);
                         updatePaginationUI(res.data.length);
-                        updateLocationOptions(res.data);
                     } else {
                         container.innerHTML = `<p style="color: red; padding: 20px;">載入失敗: ${res ? res.message : "未知錯誤"}</p>`;
                     }
@@ -136,7 +151,7 @@
                 container.innerHTML = '';
 
                 if (data.length === 0) {
-                    container.innerHTML = '<p style="color: white; padding: 20px;">目前沒有符合條件的紀錄。</p>';
+                    container.innerHTML = '<p style="color: black; padding: 20px;font-size: 1.2rem;">目前沒有符合條件的紀錄。</p>';
                     return;
                 }
 
@@ -162,66 +177,19 @@
                 });
             }
 
-            // 5. 動態生成地點選單 (仿造原先的邏輯)
-            function updateLocationOptions(data) {
-                const locationOptions = document.getElementById('location-options');
-                
-                data.forEach(item => {
-                    if (!knownLocations.has(item.device_name)) {
-                        knownLocations.add(item.device_name);
-                        
-                        const li = document.createElement('li');
-                        const div = document.createElement('div');
-                        div.textContent = item.device_name;
-                        div.style.cursor = "pointer"; // 加入鼠標樣式
-                        
-                        // 綁定點擊事件
-                        div.addEventListener('click', function() {
-                            currentDevice = this.textContent;
-                            currentPage = 1;
-                            fetchRecords();
-                        });
-                        
-                        li.appendChild(div);
-                        // 將新地點插入在「總覽」按鈕之前（如果總覽按鈕存在的話）
-                        locationOptions.insertBefore(li, locationOptions.lastElementChild || null);
-                    }
-                });
 
-                // 確保「總覽」選項永遠存在並置於最下方
-                if (!document.getElementById('loc-all-btn')) {
-                    const liAll = document.createElement('li');
-                    const divAll = document.createElement('div');
-                    divAll.id = 'loc-all-btn';
-                    divAll.textContent = '總覽';
-                    divAll.style.cursor = "pointer";
-                    divAll.addEventListener('click', function() {
-                        currentDevice = null;
-                        currentPage = 1;
-                        fetchRecords();
-                    });
-                    liAll.appendChild(divAll);
-                    locationOptions.appendChild(liAll);
-                }
-            }
-
-            // 6. 更新分頁按鈕顯示狀態
             function updatePaginationUI(dataLength) {
-                const prevBtn = document.getElementById('prev-page');
-                const nextBtn = document.getElementById('next-page');
-                const indicator = document.getElementById('page-indicator');
+    const prevBtn = document.getElementById('prev-page');
+    const nextBtn = document.getElementById('next-page');
+    const indicator = document.getElementById('page-indicator');
 
-                indicator.textContent = `第 ${currentPage} 頁`;
-                prevBtn.style.display = currentPage > 1 ? 'inline-block' : 'none';
-                
-                // 如果回傳的資料小於 50 筆，代表已經是最後一頁，隱藏下一頁按鈕
-                nextBtn.style.display = dataLength === 50 ? 'inline-block' : 'none';
-            }
-
-            // 初次載入時自動執行一次資料抓取
-            fetchRecords();
-        });
+    indicator.textContent = `第 ${currentPage} 頁`;
+    prevBtn.style.display = currentPage > 1 ? 'inline-block' : 'none';
+    nextBtn.style.display = dataLength >= 5 ? 'inline-block' : 'none';
+}
+fetchRecords();
+});
     </script>
+	<script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
-<script src="{{ url_for('static', filename='script.js') }}"></script>
 </html>

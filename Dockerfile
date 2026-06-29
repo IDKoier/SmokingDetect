@@ -1,5 +1,5 @@
 FROM nvidia/cuda:11.8.0-base-ubuntu22.04
-
+ENV TZ=Asia/Taipei
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y \
@@ -19,4 +19,4 @@ COPY . .
 
 VOLUME /app/photo
 
-CMD ["python3", "server.py"]
+CMD ["python3", "sever.py"]

@@ -125,7 +125,7 @@
             <div class="settings-section">
                 <h3 class="section-title">腳本下載</h3>
                 <label for="deviceID">輸入設備 ID：</label>
-                <input type="text" id="deviceID" placeholder="請輸入設備 ID">
+                <input type="text" id="deviceID" placeholder="請輸入設備 ID" autocomplete="off">
                 <button onclick="confirmAndDownload()">新增設備&下載腳本</button>
             </div>
 
@@ -234,10 +234,8 @@ function renderDevices()
             lastOnlineTime = new Date(lastOnlineTime.getTime() - 28800000); // 時區調整
             var timeDifference = Math.floor((currentTime - lastOnlineTime) / 1000); 
             var onlineStatus = '';
-            if (timeDifference < 10) {
+            if (timeDifference < 70) {
                 onlineStatus = '目前正在線上';
-            } else if (timeDifference < 60) {
-                onlineStatus = timeDifference + ' 秒前在線';
             } else if (timeDifference < 3600) {
                 onlineStatus = Math.floor(timeDifference / 60) + ' 分鐘前在線';
             } else {
@@ -324,7 +322,10 @@ function cancelDownload()
                         // 儲存成功後開始下載
                         var downloadUrl = "/generate_script?device_ID=" + encodeURIComponent(selectedDeviceID);
                         window.location.href = downloadUrl;
-						location.reload();
+						setTimeout(function() {
+                            alert("設備新增成功！腳本已開始下載。");
+                            location.reload();
+                        }, 1500);
                     } else {
                         alert("儲存設備資訊失敗: " + data.message);
                     }
