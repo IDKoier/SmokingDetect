@@ -40,7 +40,7 @@ db_config = {
 }
 
 #測試用
-db_config['host'] = 'localhost'
+#db_config['host'] = 'localhost'
 
 device_ids = []
 device_db_mapping = {}
@@ -109,7 +109,7 @@ def process_and_display_image(device_id, image_queue, realtimes_queue, db_id):
                     recognition_time=timestamp)
                     gif.clear()
             else:
-                results = model.track(image, conf=0.3, persist=True, classes=[2], device=0)
+                results = model.track(image, conf=0.505, persist=True, classes=[2], device=0)
                 image = results[0].plot()
                 isSmokingThisFrame = False
                 if results[0].boxes and len(results[0].boxes.conf) > 0:
