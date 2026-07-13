@@ -19,6 +19,7 @@ device_MAC = get_mac_address()
 server_ip = "YOUR_IP_ADDRESS"
 server_port = "YOUR_PORT"
 server_url = "https://" + server_ip + ":" + server_port + "/upload_video/" + device_ID
+headers = {'X-MAC-Address': device_MAC}
 
 cap = cv2.VideoCapture(0)
 
@@ -35,7 +36,7 @@ while True:
 
             _, img_encoded = cv2.imencode('.jpg', frame)
             image_data = img_encoded.tobytes()
-            response = requests.post(server_url, data=image_data, verify=False)
+            response = requests.post(server_url, data=image_data, headers=headers , verify=False)
             response.raise_for_status()
             print(response.text)
 

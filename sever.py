@@ -636,30 +636,38 @@ last_online_update = {}
 @app.route('/upload_video/<device_id>', methods=['POST'])
 def upload_video(device_id):
     
-    image_data = request.data
+    client_mac = request.headers.get('X-MAC-Address')
+    if not client_mac:
+        return '未收到MAC位址', 400
     
-    if image_data:
+    conn = mysql.connector.connect(**db_config)
+    cursor = conn.cursor()
+    cursor.execute("SELECT mac_address FROM device WHERE device_name = %s", (device_id,))
+    conn.commit()
+    row = cursor.fetchone()
 
-        nparr = np.frombuffer(image_data, np.uint8)
-        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        image_queues[device_id].put(image)
+    if not row:
+        return '裝置不存在', 404
+        
+    stored_mac = row['mac_address']
+        
+    if stored_mac is None or stored_mac == '':
+        cursor.execute("UPDATE device SET mac_address = %s, last_online_time = NOW() WHERE device_name = %s", (client_mac, device_id))
+        cursor.commit()
+    elif stored_mac != client_mac:
+        return 'MAC位址驗證錯誤，拒絕存取', 403
+    else:
         now = time.time()
         if now - last_online_update.get(device_id, 0) >= 60:
             last_online_update[device_id] = now
-            try:
-                conn = mysql.connector.connect(**db_config)
-                cursor = conn.cursor()
-                cursor.execute(
-                    "UPDATE device SET last_online_time = %s WHERE device_name = %s",
-                    (datetime.datetime.now(), device_id)
-                )
-                conn.commit()
-            except Exception as e:
-                print(f"更新 last_online_time 失敗: {e}")
-            finally:
-                if conn.is_connected():
-                    cursor.close()
-                    conn.close()
+        cursor.execute("UPDATE device SET last_online_time = %s WHERE device_name = %s",(datetime.datetime.now(), device_id))
+        cursor.commit()
+        
+    image_data = request.data
+    if image_data:
+        nparr = np.frombuffer(image_data, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        image_queues[device_id].put(image)
         return '影像上傳成功'
 
     return '未收到影像資料', 400
