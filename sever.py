@@ -649,19 +649,19 @@ def upload_video(device_id):
     if not row:
         return '裝置不存在', 404
         
-    stored_mac = row['mac_address']
+    stored_mac = row[0]
         
     if stored_mac is None or stored_mac == '':
-        cursor.execute("UPDATE device SET mac_address = %s, last_online_time = NOW() WHERE device_name = %s", (client_mac, device_id))
-        cursor.commit()
+        cursor.execute("UPDATE device SET mac_address = %s, last_online_time = %s WHERE device_name = %s", (client_mac,datetime.datetime.now(), device_id))
+        conn.commit()
     elif stored_mac != client_mac:
         return 'MAC位址驗證錯誤，拒絕存取', 403
     else:
         now = time.time()
         if now - last_online_update.get(device_id, 0) >= 60:
             last_online_update[device_id] = now
-        cursor.execute("UPDATE device SET last_online_time = %s WHERE device_name = %s",(datetime.datetime.now(), device_id))
-        cursor.commit()
+            cursor.execute("UPDATE device SET last_online_time = %s WHERE device_name = %s",(datetime.datetime.now(), device_id))
+            conn.commit()
         
     image_data = request.data
     if image_data:
