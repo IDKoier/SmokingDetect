@@ -60,13 +60,12 @@
 </div>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            // 系統狀態變數
+
             let currentPage = 1;
             let currentDevice = null;
             let currentTimeRange = "all";
-            let knownLocations = new Set(); // 用於記錄已出現過的地點
+            let knownLocations = new Set(); 
 
-            // 1. 綁定時間篩選器的點擊事件
             const timeMap = {
                 "近一小時": "aHour",
                 "近六小時": "sixHour",
@@ -80,7 +79,7 @@ const locOptions = document.querySelectorAll('.loc-option');
 locOptions.forEach(function (option) {
     option.addEventListener('click', function () {
         const selectedText = this.textContent;
-        // 如果點擊的是總覽，就設為 null；否則設為該設備名稱
+
         currentDevice = (selectedText === '總覽') ? null : selectedText;
         currentPage = 1;
         fetchRecords();
@@ -92,12 +91,12 @@ locOptions.forEach(function (option) {
             timeOptions.forEach(function (option) {
                 option.addEventListener('click', function () {
                     currentTimeRange = timeMap[this.textContent] || "all";
-                    currentPage = 1; // 切換條件時回到第一頁
+                    currentPage = 1; 
                     fetchRecords();
                 });
             });
 
-            // 2. 綁定分頁按鈕事件
+
             document.getElementById('prev-page').addEventListener('click', () => {
                 if (currentPage > 1) {
                     currentPage--;
@@ -109,12 +108,12 @@ locOptions.forEach(function (option) {
                 fetchRecords();
             });
 
-            // 3. 核心抓取資料函數
+
             function fetchRecords() {
                 const container = document.getElementById('note-container');
                 container.innerHTML = '<p style="color: black; padding: 20px; font-size: 1.2rem;">資料載入中...</p>';
 
-                // 組合 URL 與參數
+
                 let url = `/api/search_device?page=${currentPage}`;
                 if (currentDevice && currentDevice !== "總覽") {
                     url += `&device_name=${encodeURIComponent(currentDevice)}`;
@@ -123,7 +122,7 @@ locOptions.forEach(function (option) {
                     url += `&time=${currentTimeRange}`;
                 }
 
-                // 發送請求
+
                 fetch(url, { method: 'GET' })
                 .then(response => {
                     if (response.status === 401) {
@@ -156,7 +155,7 @@ locOptions.forEach(function (option) {
                 }
 
                 data.forEach((item) => {
-                    // 解析時間格式 "YYYY-MM-DD HH:MM:SS"
+
                     const timeParts = item.recognition_time.split(" ");
                     const dateStr = timeParts[0] || "Unknown";
                     const timeStr = timeParts[1] || "Unknown";
@@ -164,7 +163,7 @@ locOptions.forEach(function (option) {
                     const noteDiv = document.createElement('div');
                     noteDiv.className = 'note';
                     
-                    // 完全套用原本的 HTML 結構，透過呼叫 /images/ 端口載入 GIF
+
                     noteDiv.innerHTML = `
                         <img src="/images/${item.hash_filename}.gif" alt="Smoke Image">
                         <div class="descriptions">

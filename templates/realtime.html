@@ -1,56 +1,59 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>實時監控</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>實時監控</title>
+	<link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-    <header>
-        <nav>
-            <ul>
-                <!--<li><a href="home.html">首頁</a></li>-->
-                <li><a href="realtime.html">實時監控</a></li>
-                <li><a href="records.html">監控紀錄</a></li>
-                <li><a href="settings.html">系統設定</a></li>
+	<header>
+		<nav>
+			<ul>
+				<!--<li><a href="home.html">首頁</a></li>-->
+				<li><a href="realtime.html">實時監控</a></li>
+				<li><a href="records.html">監控紀錄</a></li>
+				<li><a href="settings.html">系統設定</a></li>
 				<li><a href="login.html">管理員登入</a></li>
-				<!--<li><a href="test.html">偵測系統測試</a></li>-->
-            </ul>
-        </nav>
-    </header>
-    
-    <main>
-            <div class="row" id="image-container">
-    </main>
+			</ul>
+		</nav>
+	</header>
+
+	<main>
+			<div class="row" id="image-container">
+	</main>
+
 <script>
-    const devices = {{ devices | tojson }};
-    const container = document.getElementById('image-container');
+	const devices = {{ devices | tojson }};
+	const container = document.getElementById('image-container');
 
-    devices.forEach(deviceID => {
-        const imageContainer = document.createElement('div');
-        imageContainer.classList.add('image-box');
+	devices.forEach(deviceID => {
+		const imageContainer = document.createElement('div');
+		imageContainer.classList.add('image-box');
 
-        const img = document.createElement('img');
-        img.src = '/static/placeholder.png';
-        img.onload = () => {
-            img.src = `/api/stream/${deviceID}`;
-            img.width = 640;
-        };
-        img.onerror = () => {
-            img.src = '/static/placeholder.png';
-            img.width = 640;
-        };
+		const img = document.createElement('img');
+		img.src = '/static/placeholder.png';
+		img.onload = () => 
+		{
+			img.src = `/api/stream/${deviceID}`;
+			img.width = 640;
+		};
+		img.onerror = () => 
+		{
+			img.src = '/static/placeholder.png';
+			img.width = 640;
+		};
 
-        const caption = document.createElement('p');
-        caption.classList.add('image-caption');
-        caption.textContent = deviceID;
+		const caption = document.createElement('p');
+		caption.classList.add('image-caption');
+		caption.textContent = deviceID;
 
-        imageContainer.appendChild(img);
-        imageContainer.appendChild(caption);
+		imageContainer.appendChild(img);
+		imageContainer.appendChild(caption);
 
-        container.appendChild(imageContainer);
-    });
-	</script>
+		container.appendChild(imageContainer);
+	});
+	
+</script>
 </body>
 </html>

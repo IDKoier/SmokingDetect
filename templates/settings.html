@@ -106,7 +106,6 @@
                 <li><a href="records.html">監控紀錄</a></li>
                 <li><a href="settings.html">系統設定</a></li>
 				<li><a href="login.html">管理員登入</a></li>
-				<!--<li><a href="test.html">偵測系統測試</a></li>-->
             </ul>
         </nav>
     </header>
@@ -169,7 +168,7 @@
             </div>
         </div>
 		
-	        <!-- 確認對話框 -->
+
         <div id="confirmDialog" class="modal">
             <div class="modal-content">
                 <p>確定要新增設備：<span id="deviceIDDisplay"></span> 嗎？</p>
@@ -180,7 +179,7 @@
             </div>
         </div>
 
-        <!-- 修改設備名稱模態框 -->
+
         <div id="renameModal" class="modal">
             <div class="modal-content">
                 <h4>修改設備名稱</h4>
@@ -192,7 +191,7 @@
             </div>
         </div>
 
-        <!-- 刪除設備模態框 -->
+
         <div id="deleteModal" class="modal">
             <div class="modal-content">
                 <p>確定要刪除此設備？</p>
@@ -302,11 +301,11 @@ function cancelDownload()
 	selectedDeviceID = '';
 }
             
-            // 確認後執行下載
+
             function proceedDownload() {
                 document.getElementById("confirmDialog").style.display = "none";
                 
-                // 發送請求到後端，先儲存設備名稱
+
                 fetch('/save_device', {
                     method: 'POST',
                     headers: {
@@ -319,7 +318,7 @@ function cancelDownload()
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        // 儲存成功後開始下載
+
                         var downloadUrl = "/generate_script?device_ID=" + encodeURIComponent(selectedDeviceID);
                         window.location.href = downloadUrl;
 						setTimeout(function() {
@@ -446,7 +445,7 @@ function confirmDeleteAdmin(adminName) {
     .then(data => {
         if (data.success) {
             alert('管理員已刪除');
-            loadAdminList(); // 重新載入列表
+            loadAdminList(); 
         } else {
             throw new Error(data.message || '刪除失敗');
         }
